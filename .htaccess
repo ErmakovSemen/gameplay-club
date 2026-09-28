@@ -1,0 +1,20 @@
+# защита базы данных, ядра и конфига от скачивания по URL
+<FilesMatch "\.(db|db-wal|db-shm)$">
+    Require all denied
+</FilesMatch>
+<Files "core.php">
+    Require all denied
+</Files>
+<Files "config.php">
+    Require all denied
+</Files>
+<Files "config.example.php">
+    Require all denied
+</Files>
+
+# служебные файлы репозитория
+<FilesMatch "^(\.gitignore|\.git.*|README\.md|deploy\.sh)$">
+    Require all denied
+</FilesMatch>
+RedirectMatch 404 /\.git
+RedirectMatch 404 /tests/
