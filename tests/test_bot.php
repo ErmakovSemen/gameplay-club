@@ -358,8 +358,10 @@ ok('HTML в имени экранирован в сообщении',
 // ══════════════════════════════════════════════════════════
 group('12. Напоминания (логика reminder.php)');
 
-// бронь через 55 минут, созданная давно → напоминание нужно
-$soon = (new DateTime())->modify('+55 minutes')->setTime((int)(new DateTime())->modify('+55 minutes')->format('H'), 0);
+// Бронь через полчаса, созданная давно → напоминание нужно.
+// Смещение берём без округления до часа: округление вниз в первые минуты
+// часа уводило время в прошлое, и тест падал в зависимости от времени суток.
+$soon = (new DateTime())->modify('+30 minutes');
 $rid = add_booking($uid, 'normal', $soon->format('c'), 1, 'kiber', 120);
 db()->prepare('UPDATE bookings SET created=? WHERE id=?')
     ->execute([(new DateTime())->modify('-5 hours')->format('c'), $rid]);

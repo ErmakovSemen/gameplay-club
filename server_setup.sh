@@ -2,8 +2,11 @@
 #
 # ⚡ GAME PLAY — первичная настройка VPS (Ubuntu/Debian).
 #
-# Запускать НА СЕРВЕРЕ один раз, от root:
-#     bash server_setup.sh gameplaycc.ru
+# ПОРЯДОК ВАЖЕН: сначала залить файлы, потом запускать этот скрипт —
+# он берёт конфиг из nginx/gameplay.conf.template, который приезжает с rsync.
+#
+#   на ноутбуке:  ./deploy.sh
+#   на сервере:   cd /var/www/gameplay && bash server_setup.sh gameplaycc.ru
 #
 # Ставит nginx + PHP-FPM, настраивает сайт, выписывает HTTPS-сертификат
 # и заводит cron для напоминаний.
@@ -38,52 +41,19 @@ mkdir -p "$ROOT"
 chown -R www-data:www-data "$ROOT"
 chmod 755 "$ROOT"
 
-echo "▶ Пишу конфиг nginx…"
-cat > /etc/nginx/sites-available/gameplay <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN} www.${DOMAIN};
-    root ${ROOT};
-    index index.html;
+echo "▶ Пишу конфиг nginx из шаблона nginx/gameplay.conf.template…"
+TEMPLATE="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/nginx/gameplay.conf.template"
+if [[ ! -f "$TEMPLATE" ]]; then
+    echo "Не найден $TEMPLATE — залей каталог nginx/ вместе с остальными файлами." >&2
+    exit 1
+fi
 
-    charset utf-8;
-    client_max_body_size 8m;
-
-    # ── Запреты. Идут выше обработчика PHP: точное совпадение (=) и префикс (^~)
-    #    в nginx приоритетнее регулярных выражений, поэтому эти файлы
-    #    никогда не дойдут до PHP-FPM и не отдадутся как текст.
-    location = /config.php         { deny all; }
-    location = /config.example.php { deny all; }
-    location = /core.php           { deny all; }
-    location = /deploy.sh          { deny all; }
-    location = /server_setup.sh    { deny all; }
-    location = /README.md          { deny all; }
-    location ^~ /tests/            { deny all; }
-    location ^~ /.git              { deny all; }
-    location ~ /\.                 { deny all; }
-    location ~ \.(db|db-wal|db-shm)\$ { deny all; }
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:${SOCK};
-        # вебхук отвечает Telegram сразу и доделывает работу в фоне
-        fastcgi_read_timeout 60s;
-    }
-
-    # index.html — один большой файл с картинками внутри, сжатие заметно помогает
-    gzip on;
-    gzip_types text/html text/css application/javascript application/json image/svg+xml;
-    gzip_min_length 1024;
-
-    access_log /var/log/nginx/gameplay.access.log;
-    error_log  /var/log/nginx/gameplay.error.log;
-}
-NGINX
+sed -e "s|__LISTEN__|80|g" \
+    -e "s|__SERVER_NAME__|${DOMAIN} www.${DOMAIN}|g" \
+    -e "s|__ROOT__|${ROOT}|g" \
+    -e "s|__SOCK__|${SOCK}|g" \
+    -e "s|__LOGDIR__|/var/log/nginx|g" \
+    "$TEMPLATE" > /etc/nginx/sites-available/gameplay
 
 ln -sf /etc/nginx/sites-available/gameplay /etc/nginx/sites-enabled/gameplay
 rm -f /etc/nginx/sites-enabled/default
@@ -113,14 +83,15 @@ cat <<EOF
 ✓ Сервер настроен.
 
 Дальше:
-  1. С ноутбука залей файлы:
-       ./deploy.sh root@$(hostname -I 2>/dev/null | awk '{print $1}'):${ROOT}
-
-  2. На сервере создай config.php и впиши секреты:
+  1. Создай config.php и впиши секреты:
        cd ${ROOT}
        cp config.example.php config.php
        nano config.php
        chown www-data:www-data config.php && chmod 640 config.php
+
+  2. Убедись, что A-запись ${DOMAIN} указывает на этот сервер,
+     иначе certbot не выпишет сертификат:
+       dig +short A ${DOMAIN}
 
   3. Привяжи вебхук — один раз, в браузере:
        https://${DOMAIN}/set_webhook.php?key=ТВОЙ_CRON_KEY

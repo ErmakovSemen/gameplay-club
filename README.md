@@ -87,10 +87,34 @@ php tests/test_bot.php
 **Если токен когда-либо попал в git, чат или скриншот — отзови его
 (`/revoke` у @BotFather) и впиши новый в `config.php`.**
 
-## Деплой
+## Деплой на VPS
+
+Порядок важен: `server_setup.sh` берёт конфиг из `nginx/gameplay.conf.template`,
+который приезжает вместе с файлами.
 
 ```bash
-./deploy.sh user@host:/путь/к/сайту
+# 0. один раз — ключ на сервер, чтобы дальше всё шло без пароля
+ssh-copy-id -i ~/.ssh/gameplay_deploy.pub root@СЕРВЕР
+
+# 1. с ноутбука: прогнать тесты и залить файлы
+./deploy.sh                       # параметры берутся из .deploy.env
+./deploy.sh root@СЕРВЕР:/var/www/gameplay   # или явно
+
+# 2. на сервере: nginx + PHP-FPM + HTTPS + cron
+ssh root@СЕРВЕР
+cd /var/www/gameplay && bash server_setup.sh gameplaycc.ru
 ```
 
-Скрипт заливает файлы по rsync и **не трогает** `config.php` и базу на сервере.
+`deploy.sh` **не трогает** `config.php` и базу на сервере — секреты и брони
+переживают любую перевыкладку.
+
+### Apache или nginx
+
+`.htaccess` работает только под Apache. Под nginx он игнорируется, и без
+переноса правил `config.php` с токеном бота отдавался бы по прямой ссылке.
+Правила перенесены в `nginx/gameplay.conf.template`; проверить их можно
+локально, на настоящем nginx + PHP-FPM:
+
+```bash
+bash tests/test_nginx.sh
+```

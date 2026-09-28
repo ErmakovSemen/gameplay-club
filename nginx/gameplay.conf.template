@@ -1,0 +1,63 @@
+# ⚡ GAME PLAY — конфиг сайта для nginx.
+#
+# Шаблон. Подстановки делает server_setup.sh:
+#   __LISTEN__       порт (на сервере 80)
+#   __SERVER_NAME__  домен
+#   __ROOT__         корень сайта
+#   __SOCK__         сокет PHP-FPM
+#
+# Проект написан под Apache, но .htaccess под nginx не действует.
+# Запреты ниже — перенос правил из .htaccess. Без них config.php
+# с токеном бота отдавался бы по прямой ссылке.
+
+server {
+    listen __LISTEN__;
+    server_name __SERVER_NAME__;
+    root __ROOT__;
+    index index.html;
+
+    charset utf-8;
+    client_max_body_size 8m;
+
+    # ── Запреты ───────────────────────────────────────────────
+    # Порядок важен. В nginx точное совпадение (=) и префикс (^~)
+    # приоритетнее регулярных выражений, поэтому эти запросы
+    # не доходят до location ~ \.php$ и не исполняются PHP-FPM.
+    location = /config.php         { deny all; }
+    location = /config.example.php { deny all; }
+    location = /core.php           { deny all; }
+    location = /deploy.sh          { deny all; }
+    location = /server_setup.sh    { deny all; }
+    location = /README.md          { deny all; }
+    location = /.deploy.env        { deny all; }
+    location ^~ /tests/            { deny all; }
+    location ^~ /nginx/            { deny all; }
+    location ^~ /.git              { deny all; }
+    location ~ /\.                 { deny all; }
+    location ~ \.(db|db-wal|db-shm)$ { deny all; }
+
+    # ── Сайт ──────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:__SOCK__;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        # вебхук отвечает Telegram сразу и доделывает работу в фоне
+        fastcgi_read_timeout 60s;
+    }
+
+    # index.html — один файл на 2 МБ с картинками внутри, сжатие заметно помогает
+    gzip on;
+    # text/html nginx сжимает всегда, в списке его указывать не нужно
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    access_log __LOGDIR__/gameplay.access.log;
+    error_log  __LOGDIR__/gameplay.error.log;
+}
