@@ -12,6 +12,10 @@
 
 server {
     listen __LISTEN__;
+    # IPv6 обязателен: у домена есть AAAA-записи, и Let's Encrypt при
+    # проверке идёт по IPv6 раньше, чем по IPv4. Без этой строки
+    # certbot не выпишет сертификат, а часть посетителей не увидит сайт.
+    __LISTEN6__
     server_name __SERVER_NAME__;
     root __ROOT__;
     index index.html;

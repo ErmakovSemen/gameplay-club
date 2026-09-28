@@ -77,6 +77,7 @@ sleep 1
 echo "▶ Собираю конфиг nginx из боевого шаблона…"
 cp "$NGINX_ETC/fastcgi_params" "$WORK/fastcgi_params"
 sed -e "s|__LISTEN__|127.0.0.1:$PORT|g" \
+    -e "s|__LISTEN6__||g" \
     -e "s|__SERVER_NAME__|localhost|g" \
     -e "s|__ROOT__|$ROOT|g" \
     -e "s|__SOCK__|$WORK/php-fpm.sock|g" \

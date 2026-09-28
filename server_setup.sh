@@ -49,6 +49,7 @@ if [[ ! -f "$TEMPLATE" ]]; then
 fi
 
 sed -e "s|__LISTEN__|80|g" \
+    -e "s|__LISTEN6__|listen [::]:80;|g" \
     -e "s|__SERVER_NAME__|${DOMAIN} www.${DOMAIN}|g" \
     -e "s|__ROOT__|${ROOT}|g" \
     -e "s|__SOCK__|${SOCK}|g" \
