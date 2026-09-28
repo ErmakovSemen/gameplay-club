@@ -13,14 +13,29 @@
 #
 set -euo pipefail
 
-TARGET="${1:-}"
-if [[ -z "$TARGET" ]]; then
-    echo "Использование: ./deploy.sh user@host:/путь/к/сайту [--dry-run]" >&2
-    exit 1
-fi
-shift || true
-
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/"
+
+TARGET="${1:-}"
+SSH_OPT=()
+
+if [[ -z "$TARGET" ]]; then
+    # без аргументов берём параметры из .deploy.env (в git он не попадает)
+    if [[ -f "${SRC}.deploy.env" ]]; then
+        # shellcheck disable=SC1090
+        set -a; source "${SRC}.deploy.env"; set +a
+        TARGET="${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}"
+        if [[ -n "${SSH_KEY:-}" ]]; then
+            SSH_OPT=(-e "ssh -i ${SSH_KEY/#\~/$HOME} -o BatchMode=yes")
+        fi
+        echo "▶ Параметры из .deploy.env"
+    else
+        echo "Использование: ./deploy.sh user@host:/путь/к/сайту [--dry-run]" >&2
+        echo "  либо создай .deploy.env и запусти ./deploy.sh без аргументов" >&2
+        exit 1
+    fi
+else
+    shift || true
+fi
 
 # перед выкладкой прогоняем тесты — не хочется залить сломанное
 if command -v php >/dev/null 2>&1; then
@@ -32,9 +47,10 @@ else
 fi
 
 echo "▶ Выкладка в $TARGET"
-rsync -avz --human-readable --progress "$@" \
+rsync -avz --human-readable --progress "${SSH_OPT[@]}" "$@" \
     --exclude '.git/' \
     --exclude '.gitignore' \
+    --exclude '.deploy.env' \
     --exclude '.claude/' \
     --exclude '.DS_Store' \
     --exclude 'tests/' \
