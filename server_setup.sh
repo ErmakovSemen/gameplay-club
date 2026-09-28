@@ -74,7 +74,9 @@ fi
 
 echo "▶ Завожу cron для напоминаний (каждые 5 минут)…"
 CRON_LINE="*/5 * * * * php ${ROOT}/reminder.php >/dev/null 2>&1"
-( crontab -l 2>/dev/null | grep -v 'reminder.php' ; echo "$CRON_LINE" ) | crontab -
+# «|| true» обязательны: при пустом crontab и crontab -l, и grep возвращают 1,
+# а под set -e -o pipefail это роняло весь скрипт на этом шаге.
+( { crontab -l 2>/dev/null || true; } | grep -v 'reminder.php' || true; echo "$CRON_LINE" ) | crontab -
 systemctl enable --now cron
 
 cat <<EOF

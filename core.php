@@ -21,6 +21,16 @@ if (!defined('BOT_TOKEN')) {
 
 // ══════════ НАСТРОЙКИ КЛУБА ══════════
 
+/**
+ * Какой IP-протокол использовать для обращений к api.telegram.org.
+ * CURL_IPRESOLVE_WHATEVER — пробовать оба (подходит почти всегда).
+ * Переопределить можно в config.php: например, CURL_IPRESOLVE_V6,
+ * если провайдер режет IPv4 к Telegram, или V4 при сломанном IPv6.
+ */
+if (!defined('GP_IPRESOLVE')) {
+    define('GP_IPRESOLVE', CURL_IPRESOLVE_WHATEVER);
+}
+
 const CLUB_PHONE   = '+7 906 035 46 32';
 const CLUB_SITE    = 'https://gameplaycc.ru';
 const CLUB_CHANNEL = 'https://t.me/gameplaypcclub';
@@ -215,7 +225,10 @@ function api(string $method, array $params = []): ?array {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT => 25,
-        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,     // форс IPv4
+        // Протокол не форсим. На Timeweb часть IPv4-адресов api.telegram.org
+        // недоступна, а IPv6 работает; на другом хостинге бывает наоборот.
+        // curl сам пробует оба и берёт тот, что отвечает.
+        CURLOPT_IPRESOLVE => GP_IPRESOLVE,
     ]);
     $res = curl_exec($ch);
     curl_close($ch);
@@ -255,7 +268,7 @@ function send_document(int $chat, string $filepath, string $caption = ''): void 
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT => 60,
-        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+        CURLOPT_IPRESOLVE => GP_IPRESOLVE,
     ]);
     curl_exec($ch);
     curl_close($ch);

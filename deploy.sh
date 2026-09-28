@@ -47,7 +47,16 @@ else
 fi
 
 echo "▶ Выкладка в $TARGET"
-rsync -avz --human-readable --progress "${SSH_OPT[@]}" "$@" \
+
+# rsync не умеет создавать вложенные каталоги на приёмнике, а на чистом
+# сервере /var/www ещё нет — создаём каталог назначения заранее.
+RSYNC_PATH=()
+if [[ "$TARGET" == *:* ]]; then
+    REMOTE_DIR="${TARGET#*:}"
+    RSYNC_PATH=(--rsync-path="mkdir -p '${REMOTE_DIR}' && rsync")
+fi
+
+rsync -avz --human-readable --progress "${SSH_OPT[@]}" "${RSYNC_PATH[@]}" "$@" \
     --exclude '.git/' \
     --exclude '.gitignore' \
     --exclude '.deploy.env' \
