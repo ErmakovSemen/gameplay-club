@@ -58,6 +58,9 @@ const WH_SECRET = 'testsecret123';
 const CRON_KEY  = 'testcron123';
 EOF
 echo "фейковая база" > "$ROOT/gameplay.db"
+# файл проверки Let's Encrypt — должен отдаваться, несмотря на запрет скрытых путей
+mkdir -p "$ROOT/.well-known/acme-challenge"
+echo "acme-token-ok" > "$ROOT/.well-known/acme-challenge/probe"
 
 echo "▶ Поднимаю PHP-FPM…"
 cat > "$WORK/php-fpm.conf" <<EOF
@@ -126,6 +129,17 @@ check "GET /nginx/gameplay.conf.template"         403 "$BASE/nginx/gameplay.conf
 check "GET /server_setup.sh"                      403 "$BASE/server_setup.sh"
 check "GET /.deploy.env"                          403 "$BASE/.deploy.env"
 check "GET /.htaccess"                            403 "$BASE/.htaccess"
+
+echo
+echo "── Let's Encrypt должен пройти проверку ─────────────────────"
+check "GET /.well-known/acme-challenge/probe"     200 "$BASE/.well-known/acme-challenge/probe"
+body_acme="$(curl -s --max-time 10 "$BASE/.well-known/acme-challenge/probe" || true)"
+if [[ "$body_acme" == "acme-token-ok" ]]; then
+    printf '  \033[32m✓\033[0m %-52s содержимое верное\n' "тело ответа acme-challenge"; pass=$((pass+1))
+else
+    printf '  \033[31m✗\033[0m %-52s получено: %s\n' "тело ответа acme-challenge" "$body_acme"; fail=$((fail+1))
+fi
+check "GET /.well-known/прочее — закрыто"         403 "$BASE/.well-known/other"
 
 echo
 echo "── Вебхук ───────────────────────────────────────────────────"
