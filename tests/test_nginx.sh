@@ -17,6 +17,7 @@
 set -euo pipefail
 
 PORT="${PORT:-8911}"
+PORT_SSL="${PORT_SSL:-8912}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
 ROOT="$WORK/www"
@@ -28,7 +29,7 @@ pass=0; fail=0
 check() {  # check <описание> <ожидаемый код> <url> [curl-args...]
     local what="$1" want="$2" url="$3"; shift 3
     local got
-    got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$@" "$url" || echo 000)"
+    got="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$@" "$url" || echo 000)"
     if [[ "$got" == "$want" ]]; then
         printf '  \033[32m✓\033[0m %-52s %s\n' "$what" "$got"; pass=$((pass+1))
     else
@@ -77,10 +78,19 @@ php-fpm --fpm-config "$WORK/php-fpm.conf" 2>/dev/null
 sleep 1
 [[ -S "$WORK/php-fpm.sock" ]] || { echo "PHP-FPM не поднялся"; cat "$WORK/php-fpm.log"; exit 1; }
 
+echo "▶ Делаю самоподписанный сертификат для теста…"
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
+  -keyout "$WORK/test.key" -out "$WORK/test.crt" \
+  -subj "/CN=localhost" >/dev/null 2>&1
+
 echo "▶ Собираю конфиг nginx из боевого шаблона…"
 cp "$NGINX_ETC/fastcgi_params" "$WORK/fastcgi_params"
 sed -e "s|__LISTEN__|127.0.0.1:$PORT|g" \
     -e "s|__LISTEN6__||g" \
+    -e "s|__LISTEN_SSL__|127.0.0.1:$PORT_SSL ssl|g" \
+    -e "s|__LISTEN_SSL6__||g" \
+    -e "s|__CERT__|$WORK/test.crt|g" \
+    -e "s|__KEY__|$WORK/test.key|g" \
     -e "s|__SERVER_NAME__|localhost|g" \
     -e "s|__ROOT__|$ROOT|g" \
     -e "s|__SOCK__|$WORK/php-fpm.sock|g" \
@@ -110,52 +120,57 @@ nginx -p "$WORK" -c "$WORK/nginx.conf"
 sleep 1
 
 BASE="http://127.0.0.1:$PORT"
-echo
-echo "── Сайт ─────────────────────────────────────────────────────"
-check "GET /  — лендинг отдаётся"                 200 "$BASE/"
-check "GET /index.html"                           200 "$BASE/index.html"
-check "GET /test.php — PHP исполняется"           200 "$BASE/test.php"
-check "GET /несуществующее — 404"                 404 "$BASE/nope"
+BASES="https://127.0.0.1:$PORT_SSL"
 
 echo
-echo "── Секреты закрыты ──────────────────────────────────────────"
-check "GET /config.php"                           403 "$BASE/config.php"
-check "GET /config.example.php"                   403 "$BASE/config.example.php"
-check "GET /core.php"                             403 "$BASE/core.php"
-check "GET /gameplay.db"                          403 "$BASE/gameplay.db"
-check "GET /gameplay.db-wal"                      403 "$BASE/gameplay.db-wal"
-check "GET /tests/test_bot.php"                   403 "$BASE/tests/test_bot.php"
-check "GET /nginx/gameplay.conf.template"         403 "$BASE/nginx/gameplay.conf.template"
-check "GET /server_setup.sh"                      403 "$BASE/server_setup.sh"
-check "GET /.deploy.env"                          403 "$BASE/.deploy.env"
-check "GET /.htaccess"                            403 "$BASE/.htaccess"
-
-echo
-echo "── Let's Encrypt должен пройти проверку ─────────────────────"
-check "GET /.well-known/acme-challenge/probe"     200 "$BASE/.well-known/acme-challenge/probe"
-body_acme="$(curl -s --max-time 10 "$BASE/.well-known/acme-challenge/probe" || true)"
-if [[ "$body_acme" == "acme-token-ok" ]]; then
-    printf '  \033[32m✓\033[0m %-52s содержимое верное\n' "тело ответа acme-challenge"; pass=$((pass+1))
+echo "── HTTP: только проверка сертификата, остальное на https ────"
+check "GET /.well-known/acme-challenge/probe — отдаётся" 200 "$BASE/.well-known/acme-challenge/probe"
+check "GET /        — редирект на https"       301 "$BASE/"
+check "GET /prices  — редирект на https"       301 "$BASE/prices"
+loc="$(curl -sk -o /dev/null -w '%{redirect_url}' --max-time 10 "$BASE/" || true)"
+if [[ "$loc" == https://* ]]; then
+    printf '  \033[32m✓\033[0m %-52s %s\n' "адрес редиректа" "$loc"; pass=$((pass+1))
 else
-    printf '  \033[31m✗\033[0m %-52s получено: %s\n' "тело ответа acme-challenge" "$body_acme"; fail=$((fail+1))
+    printf '  \033[31m✗\033[0m %-52s %s\n' "адрес редиректа" "$loc"; fail=$((fail+1))
 fi
-check "GET /.well-known/прочее — закрыто"         403 "$BASE/.well-known/other"
 
 echo
-echo "── Вебхук ───────────────────────────────────────────────────"
-check "GET /webhook.php — заглушка"               200 "$BASE/webhook.php"
-check "POST без секрета"                          403 "$BASE/webhook.php" -X POST -d '{}'
-check "POST с неверным секретом"                  403 "$BASE/webhook.php" \
+echo "── HTTPS: сайт ─────────────────────────────────────────────"
+check "GET /  — лендинг отдаётся"                 200 "$BASES/"
+check "GET /index.html"                           200 "$BASES/index.html"
+check "GET /test.php — PHP исполняется"           200 "$BASES/test.php"
+check "GET /несуществующее — 404"                 404 "$BASES/nope"
+
+echo
+echo "── HTTPS: секреты закрыты ──────────────────────────────────"
+check "GET /config.php"                           403 "$BASES/config.php"
+check "GET /config.example.php"                   403 "$BASES/config.example.php"
+check "GET /core.php"                             403 "$BASES/core.php"
+check "GET /gameplay.db"                          403 "$BASES/gameplay.db"
+check "GET /gameplay.db-wal"                      403 "$BASES/gameplay.db-wal"
+check "GET /tests/test_bot.php"                   403 "$BASES/tests/test_bot.php"
+check "GET /nginx/gameplay.conf.template"         403 "$BASES/nginx/gameplay.conf.template"
+check "GET /server_setup.sh"                      403 "$BASES/server_setup.sh"
+check "GET /.deploy.env"                          403 "$BASES/.deploy.env"
+check "GET /.htaccess"                            403 "$BASES/.htaccess"
+check "GET /cert_check.php"                       403 "$BASES/cert_check.php"
+check "GET /.well-known/прочее — закрыто"         403 "$BASES/.well-known/other"
+
+echo
+echo "── HTTPS: вебхук ───────────────────────────────────────────"
+check "GET /webhook.php — заглушка"               200 "$BASES/webhook.php"
+check "POST без секрета"                          403 "$BASES/webhook.php" -X POST -d '{}'
+check "POST с неверным секретом"                  403 "$BASES/webhook.php" \
       -X POST -H 'X-Telegram-Bot-Api-Secret-Token: wrong' -d '{}'
-check "POST с верным секретом"                    200 "$BASE/webhook.php" \
+check "POST с верным секретом"                    200 "$BASES/webhook.php" \
       -X POST -H 'X-Telegram-Bot-Api-Secret-Token: testsecret123' \
       -H 'Content-Type: application/json' -d '{"update_id":1}'
-check "GET /reminder.php без ключа"               403 "$BASE/reminder.php"
-check "GET /set_webhook.php без ключа"            403 "$BASE/set_webhook.php"
+check "GET /reminder.php без ключа"               403 "$BASES/reminder.php"
+check "GET /set_webhook.php без ключа"            403 "$BASES/set_webhook.php"
 
 echo
-echo "── Содержимое закрытых файлов не утекает ────────────────────"
-body="$(curl -s --max-time 10 "$BASE/config.php" || true)"
+echo "── Токен не утекает ────────────────────────────────────────"
+body="$(curl -sk --max-time 10 "$BASES/config.php" || true)"
 if grep -q 'AAFAKE' <<<"$body"; then
     printf '  \033[31m✗\033[0m %-52s ТОКЕН ВИДЕН В ОТВЕТЕ\n' "тело ответа /config.php"; fail=$((fail+1))
 else

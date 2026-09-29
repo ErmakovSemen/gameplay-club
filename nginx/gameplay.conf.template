@@ -1,49 +1,76 @@
 # ⚡ GAME PLAY — конфиг сайта для nginx.
 #
 # Шаблон. Подстановки делает server_setup.sh:
-#   __LISTEN__       порт (на сервере 80)
+#   __LISTEN__       порт http (на сервере 80)
+#   __LISTEN6__      слушатель IPv6 для http (пусто в локальном тесте)
+#   __LISTEN_SSL__   порт https (на сервере 443 ssl)
+#   __LISTEN_SSL6__  слушатель IPv6 для https (пусто в локальном тесте)
 #   __SERVER_NAME__  домен
 #   __ROOT__         корень сайта
 #   __SOCK__         сокет PHP-FPM
+#   __CERT__         fullchain-сертификат
+#   __KEY__          приватный ключ
+#   __LOGDIR__       каталог логов
 #
 # Проект написан под Apache, но .htaccess под nginx не действует.
 # Запреты ниже — перенос правил из .htaccess. Без них config.php
 # с токеном бота отдавался бы по прямой ссылке.
 
+# ── HTTP: только проверка сертификата, остальное уводим на https ──
 server {
     listen __LISTEN__;
-    # IPv6 обязателен: у домена есть AAAA-записи, и Let's Encrypt при
-    # проверке идёт по IPv6 раньше, чем по IPv4. Без этой строки
-    # certbot не выпишет сертификат, а часть посетителей не увидит сайт.
     __LISTEN6__
     server_name __SERVER_NAME__;
-    root __ROOT__;
-    index index.html;
 
-    charset utf-8;
-    client_max_body_size 8m;
-
-    # ── Проверка Let's Encrypt ────────────────────────────────
-    # Должна стоять ВЫШЕ запрета скрытых файлов: правило «location ~ /\.»
-    # иначе отдаёт 403 на /.well-known/acme-challenge/ и ломает
-    # автопродление сертификата. Префикс ^~ приоритетнее регулярки.
+    # Проверка Let's Encrypt должна работать и по http, иначе
+    # автопродление сертификата однажды молча сломается.
     location ^~ /.well-known/acme-challenge/ {
         root __ROOT__;
         default_type "text/plain";
         try_files $uri =404;
     }
 
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── HTTPS: собственно сайт ──
+server {
+    listen __LISTEN_SSL__;
+    __LISTEN_SSL6__
+    server_name __SERVER_NAME__;
+    root __ROOT__;
+    index index.html;
+
+    ssl_certificate     __CERT__;
+    ssl_certificate_key __KEY__;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    charset utf-8;
+    client_max_body_size 8m;
+
     # ── Запреты ───────────────────────────────────────────────
     # Порядок важен. В nginx точное совпадение (=) и префикс (^~)
     # приоритетнее регулярных выражений, поэтому эти запросы
     # не доходят до location ~ \.php$ и не исполняются PHP-FPM.
+    location ^~ /.well-known/acme-challenge/ {
+        root __ROOT__;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
     location = /config.php         { deny all; }
     location = /config.example.php { deny all; }
     location = /core.php           { deny all; }
     location = /deploy.sh          { deny all; }
     location = /server_setup.sh    { deny all; }
+    location = /cert_check.php     { deny all; }
     location = /README.md          { deny all; }
     location = /.deploy.env        { deny all; }
+    location ~ ^/\.cert_check_state { deny all; }
     location ^~ /tests/            { deny all; }
     location ^~ /nginx/            { deny all; }
     location ^~ /.git              { deny all; }
@@ -62,11 +89,19 @@ server {
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
         # вебхук отвечает Telegram сразу и доделывает работу в фоне
         fastcgi_read_timeout 60s;
     }
 
-    # index.html — один файл на 2 МБ с картинками внутри, сжатие заметно помогает
+    # Канал до сервера нестабилен на длинных передачах, поэтому
+    # статику отдаём с долгим кэшем — повторные заходы не качают её заново.
+    location ~* \.(jpe?g|png|webp|avif|gif|svg|ico|woff2?|ttf|css|js)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
     gzip on;
     # text/html nginx сжимает всегда, в списке его указывать не нужно
     gzip_types text/css application/javascript application/json image/svg+xml;

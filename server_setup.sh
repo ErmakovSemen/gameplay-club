@@ -23,6 +23,7 @@ if [[ -z "$DOMAIN" ]]; then
     exit 1
 fi
 ROOT="/var/www/gameplay"
+SSL_DIR="/etc/ssl/gameplay"
 
 echo "▶ Ставлю nginx, PHP и утилиты…"
 export DEBIAN_FRONTEND=noninteractive
@@ -50,6 +51,10 @@ fi
 
 sed -e "s|__LISTEN__|80|g" \
     -e "s|__LISTEN6__|listen [::]:80;|g" \
+    -e "s|__LISTEN_SSL__|443 ssl|g" \
+    -e "s|__LISTEN_SSL6__|listen [::]:443 ssl;|g" \
+    -e "s|__CERT__|${SSL_DIR}/fullchain.pem|g" \
+    -e "s|__KEY__|${SSL_DIR}/key.pem|g" \
     -e "s|__SERVER_NAME__|${DOMAIN} www.${DOMAIN}|g" \
     -e "s|__ROOT__|${ROOT}|g" \
     -e "s|__SOCK__|${SOCK}|g" \
@@ -59,18 +64,57 @@ sed -e "s|__LISTEN__|80|g" \
 ln -sf /etc/nginx/sites-available/gameplay /etc/nginx/sites-enabled/gameplay
 rm -f /etc/nginx/sites-enabled/default
 
+# Конфиг ссылается на файлы сертификата, и без них nginx не стартует.
+# До выпуска настоящего кладём самоподписанную заглушку.
+mkdir -p "$SSL_DIR"
+if [[ ! -s "$SSL_DIR/fullchain.pem" ]]; then
+    echo "▶ Временный самоподписанный сертификат (чтобы nginx поднялся)…"
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+        -keyout "$SSL_DIR/key.pem" -out "$SSL_DIR/fullchain.pem" \
+        -subj "/CN=$DOMAIN" >/dev/null 2>&1
+    chmod 600 "$SSL_DIR/key.pem"
+fi
+
 echo "▶ Проверяю конфиг nginx…"
 nginx -t
 systemctl reload nginx
 
-echo "▶ Выписываю HTTPS-сертификат (Telegram принимает вебхук только по https)…"
-if certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos \
-           --register-unsafely-without-email --redirect; then
-    echo "  ✓ сертификат получен"
+# ── Настоящий сертификат ──────────────────────────────────────────
+# ВАЖНО: на этом сервере HTTP-проверка Let's Encrypt не проходит.
+# Их обязательная проверка «с нескольких точек мира» упирается
+# в таймаут: часть их проверяющих узлов до сервера не достаёт
+# (сеть провайдера). Поэтому выпуск идёт через DNS-проверку —
+# ей вообще не нужен доступ к серверу извне.
+echo "▶ Ставлю acme.sh…"
+if [[ ! -d ~/.acme.sh ]]; then
+    curl -s https://get.acme.sh | sh -s email=admin@"$DOMAIN" >/dev/null 2>&1
+fi
+
+if [[ -s ~/.acme.sh/${DOMAIN}_ecc/fullchain.cer ]]; then
+    echo "▶ Подключаю выпущенный сертификат к nginx…"
+    ~/.acme.sh/acme.sh --install-cert -d "$DOMAIN" --ecc \
+        --key-file       "$SSL_DIR/key.pem" \
+        --fullchain-file "$SSL_DIR/fullchain.pem" \
+        --reloadcmd      "systemctl reload nginx"
+    echo "  ✓ сертификат подключён, продление будет само перезагружать nginx"
 else
-    echo "  ⚠ certbot не смог выписать сертификат."
-    echo "    Обычно причина одна: DNS домена ещё не указывает на этот сервер."
-    echo "    Проверь A-запись и повтори:  certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+    cat <<CERT
+
+  ⚠ Настоящий сертификат ещё не выпущен — сайт пока на самоподписанном.
+    Выпустить (проверка через DNS, нужен доступ к записям домена):
+
+      ~/.acme.sh/acme.sh --issue --dns -d $DOMAIN -d www.$DOMAIN \\
+        --server letsencrypt --keylength ec-256 \\
+        --yes-I-know-dns-manual-mode-enough-go-ahead-please
+
+    Команда напечатает две TXT-записи. Добавь их в DNS домена,
+    дождись появления (dig TXT _acme-challenge.$DOMAIN) и заверши:
+
+      ~/.acme.sh/acme.sh --renew -d $DOMAIN --ecc \\
+        --yes-I-know-dns-manual-mode-enough-go-ahead-please
+
+    Затем снова запусти этот скрипт — он подключит сертификат к nginx.
+CERT
 fi
 
 echo "▶ Завожу cron для напоминаний (каждые 5 минут)…"
