@@ -9,7 +9,10 @@
 |---|---|
 | `index.html` | Лендинг: зоны, цены, контакты. Один файл, картинки внутри (base64). |
 | `core.php` | Ядро бота: база, цены, вместимость зон, обёртка над Telegram API. |
-| `webhook.php` | Приём обновлений Telegram, все экраны и админка. |
+| `webhook.php` | Все экраны и админка бота. Приём обновлений по вебхуку. |
+| `poller.php` | Бот сам опрашивает Telegram. Используется вместо вебхука. |
+| `gameplay-bot.service` | Служба systemd для `poller.php`. |
+| `cert_check.php` | Следит за сроком сертификата, пишет админу в Telegram. |
 | `reminder.php` | Напоминания за час до брони. Запускается по cron. |
 | `set_webhook.php` | Разовая привязка бота к вебхуку. |
 | `config.php` | **Секреты. В git не попадает.** Создаётся из `config.example.php`. |
@@ -36,9 +39,9 @@ php -r "echo bin2hex(random_bytes(24)), PHP_EOL;"
 > Кириллица или пробелы — и Telegram откажется ставить вебхук.
 
 ```bash
-# 2. Привязка вебхука — один раз, в браузере:
-#    https://ВАШ-ДОМЕН/set_webhook.php?key=CRON_KEY
-#    После успешного ответа файл можно удалить с сервера.
+# 2. Запуск бота (опрос Telegram — см. раздел «Вебхук или опрос»):
+cp gameplay-bot.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now gameplay-bot
 
 # 3. Cron каждые 5 минут — напоминания:
 */5 * * * * php /путь/к/сайту/reminder.php
@@ -107,6 +110,25 @@ cd /var/www/gameplay && bash server_setup.sh gameplaycc.ru
 
 `deploy.sh` **не трогает** `config.php` и базу на сервере — секреты и брони
 переживают любую перевыкладку.
+
+## Вебхук или опрос
+
+Бот работает **опросом** (`poller.php` под systemd), а не вебхуком.
+
+Причина: до сервера Telegram не достучивается. При вебхуке `getWebhookInfo`
+стабильно показывал «Connection timed out», а в логах nginx не было ни одного
+обращения от Telegram — только собственные проверки. Исходящая связь при этом
+работает, поэтому схему развернули: бот сам забирает обновления.
+
+Обработчики общие — `poller.php` подключает `webhook.php` и вызывает
+`handle_update()`. Если сеть однажды починят, можно вернуться к вебхуку:
+остановить службу и открыть `https://ВАШ-ДОМЕН/set_webhook.php?key=CRON_KEY`.
+
+```bash
+systemctl status gameplay-bot      # что происходит
+journalctl -u gameplay-bot -f      # живой журнал
+systemctl restart gameplay-bot     # перезапустить
+```
 
 ## Продление сертификата
 

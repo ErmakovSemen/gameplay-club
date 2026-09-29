@@ -9,7 +9,9 @@
 
 require_once __DIR__ . '/core.php';
 
-if (!defined('GP_TEST')) {
+// GP_TEST — тесты, GP_POLL — режим опроса (poller.php).
+// В обоих случаях этот файл подключают ради функций, а не ради обработки запроса.
+if (!defined('GP_TEST') && !defined('GP_POLL')) {
     // Принимаем только POST от Telegram с нашим секретом
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(200); exit('GAME PLAY bot ⚡'); }
     $secret = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';

@@ -154,6 +154,8 @@ check "GET /server_setup.sh"                      403 "$BASES/server_setup.sh"
 check "GET /.deploy.env"                          403 "$BASES/.deploy.env"
 check "GET /.htaccess"                            403 "$BASES/.htaccess"
 check "GET /cert_check.php"                       403 "$BASES/cert_check.php"
+check "GET /poller.php"                           403 "$BASES/poller.php"
+check "GET /gameplay-bot.service"                 403 "$BASES/gameplay-bot.service"
 check "GET /.well-known/прочее — закрыто"         403 "$BASES/.well-known/other"
 
 echo
