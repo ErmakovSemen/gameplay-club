@@ -599,6 +599,30 @@ handle_update(['callback_query' => ['id' => 'x', 'from' => ['id' => 1001],
 ok('бронь с сайта видна в «все брони» админки', str_contains(sent_text(), 'Семён'));
 
 // ══════════════════════════════════════════════════════════
+group('17. Справочник, встроенный в /booking, совпадает с ботом');
+
+$bh = @file_get_contents(__DIR__ . '/../booking/index.html');
+ok('booking/index.html читается', $bh !== false);
+if ($bh !== false && preg_match('#<script type="application/json" id="gp-cfg">(.*?)</script>#s', $bh, $mm)) {
+    $emb = json_decode($mm[1], true);
+    ok('встроенный справочник — валидный JSON', is_array($emb));
+    $live = site_config();
+    foreach ($live['zones'] as $i => $z) {
+        $e = $emb['zones'][$i] ?? [];
+        is_eq("зона {$z['key']}: ключ и порядок", $e['key'] ?? null, $z['key']);
+        is_eq("зона {$z['key']}: цены", $e['prices'] ?? null, $z['prices']);
+        is_eq("зона {$z['key']}: вместимость", $e['cap'] ?? null, $z['cap']);
+        is_eq("зона {$z['key']}: «от»", $e['from'] ?? null, $z['from']);
+    }
+    is_eq('тарифы', array_map(fn($t) => [$t['key'], $t['hours']], $emb['tariffs'] ?? []),
+                     array_map(fn($t) => [$t['key'], $t['hours']], $live['tariffs']));
+    is_eq('границы дня/вечера/ночи', [$emb['day_start'] ?? 0, $emb['eve_start'] ?? 0, $emb['night_hour'] ?? 0], [DAY_START, EVENING_START, NIGHT_HOUR]);
+    is_eq('глубина брони в днях', $emb['days_ahead'] ?? 0, BOOK_DAYS_AHEAD);
+} else {
+    ok('в booking/index.html есть блок gp-cfg', false);
+}
+
+// ══════════════════════════════════════════════════════════
 // ИТОГ
 echo "\n" . str_repeat('─', 50) . "\n";
 if ($GLOBALS['t_fail']) {

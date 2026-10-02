@@ -96,6 +96,18 @@ POST /booking/api.php   {"action":"book","zone":"ps","tariff":"kiber","date":"20
 
 Тесты связки сайт ↔ бот — группа 16 в `tests/test_bot.php`.
 
+Страница рисует зоны и тарифы сразу, из справочника, встроенного в `booking/index.html`
+(блок `<script id="gp-cfg">`), а потом сверяется с API. **Если меняешь цены, вместимость или тарифы —
+обнови и этот блок** (группа тестов 17 упадёт, если он разойдётся с `core.php`). Сгенерировать:
+
+```bash
+php -r 'define("GP_TEST",1);define("BOT_TOKEN","x");define("ADMIN_IDS",[]);define("WH_SECRET","x");define("CRON_KEY","x");
+define("GP_DB",sys_get_temp_dir()."/c.db");require "site_booking.php";$c=site_config();unset($c["days"],$c["now"]);
+$c["days_ahead"]=BOOK_DAYS_AHEAD;echo json_encode($c,JSON_UNESCAPED_UNICODE);'
+```
+
+Открытая как файл с компьютера, страница показывает режим предпросмотра (без проверки мест и отправки).
+
 ## Команды бота
 
 | Команда | Кто | Что делает |

@@ -21,6 +21,11 @@ function out(array $data, int $code = 200): void {
     exit;
 }
 
+set_exception_handler(function (Throwable $e) {
+    error_log('[booking/api] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    out(['ok' => false, 'error' => 'Сервис бронирования временно недоступен. Позвоните: ' . CLUB_PHONE], 500);
+});
+
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {

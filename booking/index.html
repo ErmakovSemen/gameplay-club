@@ -78,26 +78,52 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 
 /* ---- steps ---- */
 .steps{display:flex;flex-direction:column;gap:14px;position:relative;min-width:0}
-.step{padding:clamp(18px,2.6vw,28px);--ch:18px;min-width:0;max-width:100%;transition:opacity .4s,transform .4s,filter .4s}
-.step.locked{opacity:.42;filter:saturate(.6);pointer-events:none}
-.step-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
-.step-no{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--plasma);width:62px;flex-shrink:0;display:flex;align-items:center;gap:8px}
-.step-no b{font-size:14px;font-weight:700;color:#fff}
-.step-head h2{font-family:var(--disp);font-weight:800;font-size:clamp(18px,2.2vw,24px);text-transform:uppercase;letter-spacing:.02em;color:#fff;flex:1}
-.step-pick{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--ok);display:none;align-items:center;gap:8px;white-space:nowrap}
-.step.done .step-pick{display:inline-flex}
-.step-pick::before{content:"\2713"}
-.step-edit{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:6px 10px;display:none}
+.step{padding:clamp(18px,2.6vw,28px);--ch:18px;min-width:0;max-width:100%;transition:opacity .4s,filter .4s}
+.step.locked{opacity:.4;filter:saturate(.5);pointer-events:none}
+.step-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:16px;margin-bottom:20px}
+.step-ix{position:relative;isolation:isolate;width:46px;height:46px;display:grid;place-items:center;flex-shrink:0;
+  background:linear-gradient(140deg,var(--volt),var(--storm));clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.step-ix::before{content:"";position:absolute;inset:1px;z-index:-1;background:#140c22;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+.step-ix b{font-family:var(--mono);font-size:14px;font-weight:700;color:#fff;letter-spacing:.04em}
+.step-ix i{display:none;font-style:normal;font-size:18px;font-weight:900;color:#06040a}
+.step:not(.locked):not(.done) .step-ix{box-shadow:0 0 0 0 rgba(232,121,249,.5);animation:ixPulse 2.4s ease-in-out infinite}
+@keyframes ixPulse{50%{filter:drop-shadow(0 0 10px rgba(232,121,249,.7))}}
+.step.done .step-ix{background:var(--ok)}
+.step.done .step-ix::before{display:none}
+.step.done .step-ix b{display:none}
+.step.done .step-ix i{display:block}
+.step-tt{min-width:0;display:flex;flex-direction:column;gap:5px}
+.step-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--plasma);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step-tt h2{font-family:var(--disp);font-weight:800;font-size:clamp(19px,2.3vw,25px);line-height:1.05;text-transform:uppercase;letter-spacing:.01em;color:#fff}
+.step-r{display:flex;align-items:center;gap:12px;justify-self:end;min-width:0}
+.step-pick{display:none;align-items:center;gap:8px;max-width:260px;padding:7px 12px;font-size:13px;font-weight:700;color:#fff;background:rgba(74,222,128,.08);border-left:2px solid var(--ok);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step.done .step-pick{display:inline-block}
+.step-edit{display:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:8px 10px;border:1px solid var(--line);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);transition:color .3s,border-color .3s}
 .step.done .step-edit{display:inline-block}
-.step-edit:hover{color:var(--storm)}
+.step-edit:hover{color:#fff;border-color:var(--line-hot)}
 .step.done .step-body{display:none}
-.step.done{padding-bottom:14px}
+.step.done{padding-top:16px;padding-bottom:16px}
 .step.done .step-head{margin-bottom:0}
-.hint{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);margin-top:12px}
+.step.done .step-tt h2{font-size:clamp(16px,1.8vw,19px);color:#c9c3de}
+@media (max-width:600px){
+  .step-head{grid-template-columns:auto minmax(0,1fr);row-gap:10px;column-gap:14px}
+  .step-r{grid-column:2;justify-self:start}
+  .step:not(.done) .step-r{display:none}
+  .step-pick{max-width:200px}
+}
+.hint{font-family:var(--mono);font-size:11px;letter-spacing:.1em;line-height:1.6;color:var(--dim);margin-top:14px}
+
+/* notice (preview / service down) */
+.notice{display:none;gap:14px;align-items:flex-start;padding:16px 18px;--ch:14px;font-size:14px;color:#e6e0f5;line-height:1.5}
+.notice.show{display:flex}
+.notice svg{flex-shrink:0;width:22px;height:22px;stroke:var(--storm);margin-top:1px}
+.notice b{color:#fff}
+.notice a{color:var(--plasma);font-weight:700;border-bottom:1px solid rgba(192,132,252,.35)}
 
 /* option cards */
 .opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.opt{text-align:left;padding:16px 16px 15px;display:flex;flex-direction:column;gap:8px;--ch:12px;transition:transform .3s cubic-bezier(.2,.7,.2,1),background .3s;min-width:0}
+.opt{text-align:left;padding:16px 16px 14px;display:flex;flex-direction:column;gap:10px;min-height:100%;--ch:12px;transition:transform .3s cubic-bezier(.2,.7,.2,1),background .3s;min-width:0}
 .opt:hover{transform:translateY(-3px);background:linear-gradient(160deg,var(--volt),rgba(232,121,249,.6))}
 .opt.sel{background:linear-gradient(160deg,var(--volt),var(--storm));box-shadow:0 18px 50px rgba(88,28,135,.45)}
 .opt.sel::before{background:linear-gradient(160deg,#1d1230,#120b1d)}
@@ -105,12 +131,21 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 .opt-title{font-family:var(--disp);font-weight:800;font-size:17px;color:#fff;letter-spacing:.01em}
 .opt-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:#fff;padding:4px 8px;background:linear-gradient(120deg,var(--volt),var(--storm));clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
 .opt-sub{font-size:12.5px;color:var(--dim);line-height:1.35}
-.opt-price{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--plasma);margin-top:2px}
+.opt-price{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--plasma);margin-top:auto;padding-top:4px}
+.opt-foot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:auto;padding-top:6px;border-top:1px dashed rgba(139,92,246,.22)}
+.opt-foot .opt-price{margin:0;padding:0}
+.opt-cap{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.opt-ico{width:34px;height:34px;display:grid;place-items:center;color:var(--plasma);background:rgba(139,92,246,.12);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);transition:background .3s,color .3s}
+.opt-ico svg{width:17px;height:17px}
+.opt:hover .opt-ico,.opt.sel .opt-ico{background:linear-gradient(140deg,var(--volt),var(--storm));color:#fff}
+.opt-head{display:flex;align-items:center;gap:12px;min-width:0}
+.opt-head .opt-title{flex:1;min-width:0}
 .opt-price b{font-family:var(--disp);font-size:16px;font-weight:800;color:#fff;letter-spacing:0}
 .opt.sel .opt-sub{color:#c9c3de}
-.opt .ck{position:absolute;right:12px;top:12px;width:20px;height:20px;border-radius:50%;background:var(--ok);color:#06040a;font-size:12px;font-weight:900;display:none;place-items:center;box-shadow:0 0 14px var(--ok)}
+.opt .ck{position:absolute;right:10px;bottom:10px;width:20px;height:20px;border-radius:50%;background:var(--ok);color:#06040a;font-size:12px;font-weight:900;display:none;place-items:center;box-shadow:0 0 14px var(--ok)}
 .opt.sel .ck{display:grid}
-@media (max-width:520px){.opts{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.opt{padding:13px 12px}.opt-title{font-size:15px}}
+.opt.sel .opt-cap{opacity:0}
+@media (max-width:520px){#zones{grid-template-columns:minmax(0,1fr)}.opts{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.opt{padding:13px 12px}.opt-title{font-size:15px}}
 
 /* days + hours */
 .days{display:flex;gap:8px;min-width:0;max-width:100%;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -122,7 +157,18 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 .day:hover{transform:translateY(-2px);background:linear-gradient(160deg,var(--volt),var(--storm))}
 .day.sel{background:linear-gradient(160deg,var(--volt),var(--storm))}
 .day.sel::before{background:linear-gradient(160deg,#1d1230,#120b1d)}
-.hours{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:16px;min-height:60px}
+.hours{margin-top:18px;min-height:60px;display:flex;flex-direction:column;gap:18px}
+.hgrp-h{display:flex;align-items:baseline;gap:12px;margin-bottom:10px}
+.hgrp-h b{font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#fff}
+.hgrp-h span{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--dim)}
+.hgrp-h::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(139,92,246,.35),transparent)}
+.hours-g{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+@media (max-width:1180px){.hours-g{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (max-width:980px){.hours-g{grid-template-columns:repeat(8,minmax(0,1fr))}}
+@media (max-width:760px){.hours-g{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.hr small em{font-style:normal}
+@media (max-width:520px){.hr small em{display:none}.hr small::before{content:"мест: "}}
+@media (max-width:420px){.hours-g{gap:6px}.hr{padding:9px 4px}.hr b{font-size:14px}.hr small{font-size:9.5px}}
 .hr{padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;--ch:8px;transition:transform .25s,background .3s}
 .hr b{font-family:var(--mono);font-size:15px;font-weight:700;color:#fff;letter-spacing:.04em}
 .hr span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--plasma)}
@@ -155,7 +201,12 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 
 /* summary */
 .sum{position:sticky;top:88px;padding:24px;--ch:18px;display:flex;flex-direction:column;gap:14px}
-.sum-h{display:flex;align-items:center;justify-content:space-between}
+.sum-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sum-step{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.prog{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.prog i{height:4px;background:rgba(139,92,246,.18);clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%);transition:background .4s,box-shadow .4s}
+.prog i.on{background:linear-gradient(90deg,var(--volt),var(--storm));box-shadow:0 0 10px rgba(232,121,249,.6)}
+.prog i.cur{background:rgba(232,121,249,.4)}
 .sum-h .eyebrow::after{display:none}
 .sum-rows{display:flex;flex-direction:column;gap:10px}
 .sr{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-bottom:10px;border-bottom:1px dashed rgba(139,92,246,.2)}
@@ -165,7 +216,9 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 .sum-price{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:4px}
 .sum-price span{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
 .sum-price b{font-family:var(--disp);font-weight:900;font-size:40px;line-height:1;background:linear-gradient(100deg,#fff,var(--plasma) 60%,var(--storm));-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
-.sum-price small{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ok)}
+.sum-price small{display:block;margin-top:4px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ok)}
+.sum-wait{display:block;font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#5c5878}
+.sum-price b:empty{display:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:17px 22px;font-family:var(--disp);font-weight:800;font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:#fff;
   background:linear-gradient(120deg,var(--volt),var(--storm));clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
   position:relative;overflow:hidden;transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,opacity .3s}
@@ -192,6 +245,7 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--stor
 .bar .bp{flex:1;min-width:0}
 .bar .bp span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar .bp b{font-family:var(--disp);font-weight:900;font-size:22px;color:#fff;line-height:1.1}
+.bar .bp b.st{font-size:15px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--plasma)}
 .bar .btn{width:auto;padding:14px 18px;font-size:12.5px}
 @media (max-width:980px){.bar{display:flex}.sum .btn{display:none}.sum{position:static}.grid{padding-bottom:140px}}
 
@@ -248,44 +302,42 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
 
   <div class="grid">
     <div class="steps">
+      <div class="notice ch" id="notice" role="status"></div>
       <section class="step ch rv d2" id="s1">
         <div class="step-head">
-          <span class="step-no"><b>01</b>зона</span>
-          <h2>Где играем?</h2>
-          <span class="step-pick" id="p1"></span>
-          <button class="step-edit" data-edit="1">изменить</button>
+          <span class="step-ix"><b>01</b><i>✓</i></span>
+          <div class="step-tt"><span class="step-k">Шаг 1 из 4 · зона</span><h2>Где играем?</h2></div>
+          <div class="step-r"><span class="step-pick" id="p1"></span><button class="step-edit" data-edit="1">Изменить</button></div>
         </div>
         <div class="step-body"><div class="opts" id="zones"></div></div>
       </section>
 
       <section class="step ch locked rv d3" id="s2">
         <div class="step-head">
-          <span class="step-no"><b>02</b>тариф</span>
-          <h2>Сколько играем?</h2>
-          <span class="step-pick" id="p2"></span>
-          <button class="step-edit" data-edit="2">изменить</button>
+          <span class="step-ix"><b>02</b><i>✓</i></span>
+          <div class="step-tt"><span class="step-k">Шаг 2 из 4 · тариф</span><h2>Сколько играем?</h2></div>
+          <div class="step-r"><span class="step-pick" id="p2"></span><button class="step-edit" data-edit="2">Изменить</button></div>
         </div>
         <div class="step-body"><div class="opts" id="tariffs"></div><p class="hint" id="tariffHint"></p></div>
       </section>
 
       <section class="step ch locked rv d4" id="s3">
         <div class="step-head">
-          <span class="step-no"><b>03</b>время</span>
-          <h2>Когда?</h2>
-          <span class="step-pick" id="p3"></span>
-          <button class="step-edit" data-edit="3">изменить</button>
+          <span class="step-ix"><b>03</b><i>✓</i></span>
+          <div class="step-tt"><span class="step-k">Шаг 3 из 4 · время</span><h2>Когда?</h2></div>
+          <div class="step-r"><span class="step-pick" id="p3"></span><button class="step-edit" data-edit="3">Изменить</button></div>
         </div>
         <div class="step-body">
           <div class="days" id="days"></div>
           <div class="hours" id="hours"></div>
-          <div class="hours-note" id="hoursNote"><i></i>свободно · указана цена за выбранный тариф</div>
+          <div class="hours-note" id="hoursNote"><i></i>под временем — цена за весь тариф и сколько мест свободно</div>
         </div>
       </section>
 
       <section class="step ch locked rv d4" id="s4">
         <div class="step-head">
-          <span class="step-no"><b>04</b>контакт</span>
-          <h2>Кто играет?</h2>
+          <span class="step-ix"><b>04</b><i>✓</i></span>
+          <div class="step-tt"><span class="step-k">Шаг 4 из 4 · контакты</span><h2>Кто играет?</h2></div>
         </div>
         <div class="step-body">
           <form id="form" class="form" novalidate autocomplete="on">
@@ -300,14 +352,15 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
     </div>
 
     <aside class="sum ch rv d3" id="sum">
-      <div class="sum-h"><span class="eyebrow">Ваша бронь</span><span class="chipx" style="padding:0"><i></i></span></div>
+      <div class="sum-h"><span class="eyebrow">Ваша бронь</span><span class="sum-step" id="sumStep">шаг 1 / 4</span></div>
+      <div class="prog" id="prog"><i></i><i></i><i></i><i></i></div>
       <div class="sum-rows">
         <div class="sr"><span>Зона</span><b class="muted" id="rZone">—</b></div>
         <div class="sr"><span>Тариф</span><b class="muted" id="rTariff">—</b></div>
         <div class="sr"><span>Начало</span><b class="muted" id="rWhen">—</b></div>
         <div class="sr"><span>До</span><b class="muted" id="rUntil">—</b></div>
       </div>
-      <div class="sum-price"><span>Итого</span><div style="text-align:right"><b id="rPrice">—</b><br><small>оплата в клубе</small></div></div>
+      <div class="sum-price"><span>Итого</span><div style="text-align:right"><b id="rPrice"></b><em class="sum-wait" id="rWait">появится после выбора времени</em><small>оплата в клубе</small></div></div>
       <button class="btn" id="submit" disabled>Забронировать</button>
       <p class="fine">Нажимая «Забронировать», вы соглашаетесь, что мы сохраним имя и телефон, чтобы найти вашу бронь в клубе.</p>
       <div class="alt"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"/></svg>или в <a href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener">Telegram-боте</a></div>
@@ -316,7 +369,7 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
 </main>
 
 <div class="bar" id="bar">
-  <div class="bp"><span id="bpL">Выберите зону</span><b id="bpP">—</b></div>
+  <div class="bp"><span id="bpL">Выберите зону</span><b id="bpP">Шаг 1 из 4</b></div>
   <button class="btn" id="submitM" disabled>Забронировать</button>
 </div>
 
@@ -349,11 +402,12 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
   </div>
 </footer>
 
+<script type="application/json" id="gp-cfg">{"zones":[{"key":"bootcamp","title":"Bootcamp","tag":"VIP","sub":"RTX 5060 · 32 ГБ · 300 Гц, изогнутые","cap":5,"from":170,"prices":{"day":{"wd":[170,450,680],"we":[190,520,780]},"eve":{"wd":[190,520,780],"we":[220,590,900]},"night":{"wd":800,"we":920}}},{"key":"normal","title":"Normal","tag":"","sub":"RTX 3060 · 16 ГБ · 180 Гц","cap":10,"from":120,"prices":{"day":{"wd":[120,320,480],"we":[140,360,560]},"eve":{"wd":[140,360,560],"we":[160,420,640]},"night":{"wd":580,"we":660}}},{"key":"ps_vip","title":"PS5 Pro · VIP","tag":"VIP","sub":"PlayStation 5 Pro · 65″ 120 Гц · VIP зона","cap":1,"from":320,"prices":{"day":{"wd":[320,820,1200],"we":[370,900,1350]},"eve":{"wd":[350,900,1350],"we":[400,1000,1450]},"night":{"wd":1500,"we":1750}}},{"key":"ps","title":"PS5 · GamePlay","tag":"","sub":"PlayStation 5 · 55″ 120 Гц · обычная зона","cap":1,"from":270,"prices":{"day":{"wd":[270,620,950],"we":[320,700,1100]},"eve":{"wd":[300,700,1100],"we":[350,800,1250]},"night":{"wd":1300,"we":1500}}}],"tariffs":[{"key":"kiber","title":"Киберчас","sub":"1 час","hours":1},{"key":"tripl","title":"Трипл","sub":"3 часа","hours":3},{"key":"ultra","title":"Ультра","sub":"5 часов","hours":5},{"key":"night","title":"Ночь","sub":"20:00 – 8:00","hours":12}],"day_start":8,"eve_start":16,"night_hour":20,"phone":"+7 906 035 46 32","address":"г. Электросталь, проспект Ленина, 40\/8","channel":"https:\/\/t.me\/gameplaypcclub","days_ahead":7}</script>
 <script>
 (function(){
 "use strict";
 var API = 'api.php';
-var cfg = null;
+var cfg = null, mode = 'live';
 var sel = { zone:null, tariff:null, date:null, hour:null, price:null, slotsHours:null };
 var $ = function(id){ return document.getElementById(id); };
 
@@ -377,6 +431,22 @@ var rio = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.i
 document.querySelectorAll('.rv').forEach(function(el){ rio.observe(el); });
 
 /* ---------- helpers ---------- */
+var ICO = {
+  pc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>',
+  pad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12a4 4 0 0 1 4 4v3a3 3 0 0 1-5.4 1.8L15 15H9l-1.6 1.8A3 3 0 0 1 2 15v-3a4 4 0 0 1 4-4z"/><path d="M8 11v3M6.5 12.5h3"/><circle cx="16" cy="11.5" r=".8"/><circle cx="18" cy="13.5" r=".8"/></svg>'
+};
+function seatsWord(n){ var m10 = n % 10, m100 = n % 100; if (m10 === 1 && m100 !== 11) return 'место'; if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'места'; return 'мест'; }
+function localDays(n){
+  var W = ['пн','вт','ср','чт','пт','сб','вс'], out = [];
+  for (var i = 0; i < n; i++) {
+    var d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+    var wd = (d.getDay() + 6) % 7;
+    out.push({ date: d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()),
+      label: i === 0 ? 'Сегодня' : i === 1 ? 'Завтра' : d.getDate() + '.' + pad(d.getMonth()+1), wday: W[wd], weekend: wd >= 4 });
+  }
+  return out;
+}
+
 function fmtPrice(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽'; }
 function pad(n){ return (n < 10 ? '0' : '') + n; }
 function zoneOf(k){ return cfg.zones.filter(function(z){ return z.key === k; })[0]; }
@@ -400,10 +470,11 @@ function setStep(n, state){ var s = $('s' + n); s.classList.remove('locked','don
 /* ---------- render ---------- */
 function renderZones(){
   $('zones').innerHTML = cfg.zones.map(function(z){
+    var ico = z.key.indexOf('ps') === 0 ? ICO.pad : ICO.pc;
     return '<button class="opt ch" data-zone="' + z.key + '"><span class="ck">✓</span>'
-      + '<div class="opt-top"><span class="opt-title">' + z.title + '</span>' + (z.tag ? '<span class="opt-tag">' + z.tag + '</span>' : '') + '</div>'
+      + '<div class="opt-head"><span class="opt-ico">' + ico + '</span><span class="opt-title">' + z.title + '</span>' + (z.tag ? '<span class="opt-tag">' + z.tag + '</span>' : '') + '</div>'
       + '<span class="opt-sub">' + z.sub + '</span>'
-      + '<span class="opt-price">от <b>' + fmtPrice(z.from) + '</b> / час</span></button>';
+      + '<div class="opt-foot"><span class="opt-price">от <b>' + fmtPrice(z.from) + '</b> / час</span><span class="opt-cap">' + z.cap + ' ' + seatsWord(z.cap) + '</span></div></button>';
   }).join('');
 }
 function renderTariffs(){
@@ -423,26 +494,54 @@ function renderDays(){
   }).join('');
 }
 var slotsReq = 0;
+function localSlots(){
+  var t = tariffOf(sel.tariff), day = dayOf(sel.date), now = new Date(), out = [];
+  var hrs = sel.tariff === 'night' ? [cfg.night_hour] : Array.from({ length:24 }, function(_, i){ return i; });
+  hrs.forEach(function(h){
+    var st = new Date(sel.date + 'T' + pad(h) + ':00:00');
+    if (st < now) return;
+    out.push({ hour:h, free: zoneOf(sel.zone).cap, price: priceFor(sel.zone, sel.tariff, day, h) });
+  });
+  return { ok:true, hours:t.hours, slots:out };
+}
+function drawSlots(d){
+  var h = $('hours');
+  sel.slotsHours = d.hours;
+  var free = d.slots.filter(function(s){ return s.free > 0; });
+  if (!d.slots.length || !free.length) { h.innerHTML = '<p class="empty">На эту дату свободных окон нет — выберите другой день.</p>'; return; }
+  function cell(s){
+    if (sel.tariff === 'night') {
+      var end = (s.hour + d.hours) % 24;
+      return '<button class="hr ch night" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00 → ' + pad(end) + ':00</b><span>' + fmtPrice(s.price) + '</span></button>';
+    }
+    return '<button class="hr ch' + (s.free > 0 ? '' : ' full') + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00</b><span>' + fmtPrice(s.price) + '</span>'
+      + (s.free > 0 ? '<small>' + (zoneOf(sel.zone).cap > 1 ? '<em>свободно </em>' + s.free : 'свободно') + '</small>' : '<small>занято</small>') + '</button>';
+  }
+  if (sel.tariff === 'night') { h.innerHTML = '<div class="hours-g">' + d.slots.map(cell).join('') + '</div>'; if (free.length === 1) pickHour(free[0].hour, free[0].price, false); return; }
+  var groups = [
+    { t:'Ночь',  s:'00:00–07:59 · вечерние цены', test:function(x){ return x < cfg.day_start; } },
+    { t:'День',  s:pad(cfg.day_start) + ':00–' + pad(cfg.eve_start - 1) + ':59 · дневные цены', test:function(x){ return x >= cfg.day_start && x < cfg.eve_start; } },
+    { t:'Вечер', s:pad(cfg.eve_start) + ':00–23:59 · вечерние цены', test:function(x){ return x >= cfg.eve_start; } }
+  ];
+  h.innerHTML = groups.map(function(g){
+    var list = d.slots.filter(function(s){ return g.test(s.hour); });
+    if (!list.length) return '';
+    return '<div class="hgrp"><div class="hgrp-h"><b>' + g.t + '</b><span>' + g.s + '</span></div><div class="hours-g">' + list.map(cell).join('') + '</div></div>';
+  }).join('');
+}
 function loadSlots(){
-  var h = $('hours'); h.innerHTML = '<div class="loading">Смотрим свободные окна</div>';
+  var h = $('hours');
+  if (mode !== 'live') { drawSlots(localSlots()); return; }
+  h.innerHTML = '<div class="loading">Смотрим свободные окна</div>';
   var my = ++slotsReq;
   fetch(API + '?action=slots&zone=' + sel.zone + '&tariff=' + sel.tariff + '&date=' + sel.date, { cache:'no-store' })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (my !== slotsReq) return;
       if (!d.ok) { h.innerHTML = '<p class="empty">' + (d.error || 'Не получилось загрузить окна') + '</p>'; return; }
-      sel.slotsHours = d.hours;
-      var free = d.slots.filter(function(s){ return s.free > 0; });
-      if (!d.slots.length || !free.length) { h.innerHTML = '<p class="empty">На эту дату свободных окон нет — выберите другой день.</p>'; return; }
-      h.innerHTML = d.slots.map(function(s){
-        var end = (s.hour + d.hours) % 24;
-        if (sel.tariff === 'night') return '<button class="hr ch night" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00 → ' + pad(end) + ':00</b><span>' + fmtPrice(s.price) + '</span></button>';
-        return '<button class="hr ch' + (s.free > 0 ? '' : ' full') + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00</b><span>' + fmtPrice(s.price) + '</span>'
-          + (s.free > 0 ? '<small>свободно ' + s.free + '</small>' : '<small>занято</small>') + '</button>';
-      }).join('');
-      if (sel.tariff === 'night' && free.length === 1) pickHour(free[0].hour, free[0].price, false);
+      drawSlots(d);
     })
-    .catch(function(){ if (my === slotsReq) h.innerHTML = '<p class="empty">Нет связи с сервером. Обновите страницу или позвоните: ' + cfg.phone + '</p>'; });
+    .catch(function(){ if (my === slotsReq) h.innerHTML = '<p class="empty">Нет связи с сервером. Обновите страницу или позвоните: <a href="tel:+79060354632" style="color:var(--plasma)">' + cfg.phone + '</a></p>'; });
 }
 
 /* ---------- summary ---------- */
@@ -455,10 +554,15 @@ function updateSummary(){
   set('rWhen', when);
   var until = (sel.hour !== null && sel.slotsHours) ? pad((sel.hour + sel.slotsHours) % 24) + ':00' + (sel.hour + sel.slotsHours >= 24 ? ' (след. день)' : '') : null;
   set('rUntil', until);
-  $('rPrice').textContent = sel.price !== null ? fmtPrice(sel.price) : '—';
+  $('rPrice').textContent = sel.price !== null ? fmtPrice(sel.price) : '';
+  $('rWait').style.display = sel.price !== null ? 'none' : '';
   var ready = sel.zone && sel.tariff && sel.date && sel.hour !== null;
+  var stepN = !sel.zone ? 1 : !sel.tariff ? 2 : (sel.hour === null ? 3 : 4);
+  $('sumStep').textContent = 'шаг ' + stepN + ' / 4';
+  Array.prototype.forEach.call($('prog').children, function(el, i){ el.className = i < stepN - 1 || (ready && i === 3 && $('fName').value.trim().length > 1 && $('fPhone').value.replace(/\D/g,'').length >= 11) ? 'on' : (i === stepN - 1 ? 'cur' : ''); });
   $('submit').disabled = !ready; $('submitM').disabled = !ready;
-  $('bpP').textContent = sel.price !== null ? fmtPrice(sel.price) : '—';
+  $('bpP').textContent = sel.price !== null ? fmtPrice(sel.price) : 'Шаг ' + stepN + ' из 4';
+  $('bpP').classList.toggle('st', sel.price === null);
   $('bpL').textContent = !sel.zone ? 'Выберите зону' : !sel.tariff ? z.title + ' · выберите тариф' : !sel.date ? z.title + ' · ' + t.title + ' · выберите день' : sel.hour === null ? 'Выберите время' : (z.title + ' · ' + when);
 }
 
@@ -505,6 +609,7 @@ document.addEventListener('click', function(e){
 });
 
 /* ---------- phone mask (light) ---------- */
+['fName','fPhone'].forEach(function(id){ $(id).addEventListener('input', function(){ if (cfg) updateSummary(); }); });
 $('fPhone').addEventListener('input', function(){
   var v = this.value, d = v.replace(/\D/g, '');
   if (!d) { return; }
@@ -523,6 +628,8 @@ $('fPhone').addEventListener('input', function(){
 /* ---------- submit ---------- */
 function showMsg(t){ var m = $('msg'); m.textContent = t; m.classList.toggle('show', !!t); if (t) scrollTo($('s4')); }
 function submit(){
+  if (mode === 'preview') { showMsg('Это предпросмотр страницы: настоящая бронь отправляется только на сайте — gameplaycc.ru/booking/'); return; }
+  if (mode === 'down') { showMsg('Онлайн-бронь сейчас недоступна. Позвоните нам: ' + cfg.phone + ' — или забронируйте в Telegram-боте.'); return; }
   var name = $('fName').value.trim(), phone = $('fPhone').value.trim();
   $('fName').parentNode.classList.toggle('err', name.length < 2);
   $('fPhone').parentNode.classList.toggle('err', phone.replace(/\D/g,'').length < 10);
@@ -554,14 +661,38 @@ $('again').addEventListener('click', function(){
 });
 
 /* ---------- boot ---------- */
-fetch(API + '?action=config', { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(d){
-  cfg = d; renderZones(); renderTariffs(); renderDays(); updateSummary();
+function notice(html){ var n = $('notice'); n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><div>' + html + '</div>'; n.classList.add('show'); }
+function renderAll(){
+  renderZones(); renderTariffs(); renderDays(); updateSummary();
+  if (sel.zone) document.querySelectorAll('[data-zone]').forEach(function(b){ b.classList.toggle('sel', b.dataset.zone === sel.zone); });
+  if (sel.tariff) document.querySelectorAll('[data-tariff]').forEach(function(b){ b.classList.toggle('sel', b.dataset.tariff === sel.tariff); });
+  if (sel.date) document.querySelectorAll('[data-date]').forEach(function(b){ b.classList.toggle('sel', b.dataset.date === sel.date); });
+}
+try { cfg = JSON.parse($('gp-cfg').textContent); } catch(e) { cfg = null; }
+if (cfg) {
+  cfg.days = localDays(cfg.days_ahead || 7);
+  renderAll();
   try { var c = JSON.parse(localStorage.getItem('gp_contact') || 'null'); if (c) { $('fName').value = c.name || ''; $('fPhone').value = c.phone || ''; } } catch(e){}
   var q = new URLSearchParams(location.search).get('zone');
   if (q && zoneOf(q)) pickZone(q, true);
-}).catch(function(){
-  $('zones').innerHTML = '<p class="empty">Сервис бронирования временно недоступен. Позвоните нам: <a href="tel:+79060354632" style="color:var(--plasma)">+7 906 035 46 32</a></p>';
-});
+}
+if (location.protocol === 'file:') {
+  mode = 'preview';
+  notice('<b>Предпросмотр страницы.</b> Файл открыт с компьютера, поэтому свободные места не проверяются и бронь не отправится. На сайте страница работает по адресу <b>gameplaycc.ru/booking/</b>.');
+} else {
+  fetch(API + '?action=config', { cache:'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      if (!d || !d.zones) throw new Error('bad');
+      var keep = cfg && cfg.days; cfg = d; if (!cfg.days && keep) cfg.days = keep;
+      if (sel.date && !dayOf(sel.date)) { sel.date = null; sel.hour = null; sel.price = null; }
+      renderAll(); if (sel.date && sel.tariff) loadSlots();
+    })
+    .catch(function(){
+      mode = 'down';
+      notice('<b>Онлайн-бронь временно недоступна.</b> Позвоните нам — <a href="tel:+79060354632">+7 906 035 46 32</a> — или забронируйте в <a href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener">Telegram-боте</a>. Цены и тарифы ниже актуальны.');
+    });
+}
 })();
 </script>
 </body>
