@@ -56,7 +56,8 @@ if [[ "$TARGET" == *:* ]]; then
     RSYNC_PATH=(--rsync-path="mkdir -p '${REMOTE_DIR}' && rsync")
 fi
 
-rsync -avz --human-readable --progress "${SSH_OPT[@]}" "${RSYNC_PATH[@]}" "$@" \
+# ${arr[@]+"${arr[@]}"} — пустой массив под set -u без ошибки и в bash 3.2 (macOS)
+rsync -avz --human-readable --progress ${SSH_OPT[@]+"${SSH_OPT[@]}"} ${RSYNC_PATH[@]+"${RSYNC_PATH[@]}"} ${@+"$@"} \
     --exclude '.git/' \
     --exclude '.gitignore' \
     --exclude '.deploy.env' \
