@@ -923,6 +923,12 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
   background:rgba(8,5,14,.7);padding:5px 9px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);}
 @media (max-width:480px){.stats{grid-template-columns:1fr 1fr;}.stat{padding:14px 14px;}}
 
+/* nav: booking link */
+.nav-book{font-family:var(--mono)!important;font-size:12px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase;color:#fff!important;padding:9px 14px!important;
+  background:linear-gradient(120deg,var(--volt),var(--storm));clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);transition:transform .3s,box-shadow .3s!important;}
+.nav-book::after{display:none!important;}
+.nav-book:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(168,85,247,.45);}
+#mmenu .nav-book{border-bottom:0;margin-top:10px;text-align:center;font-size:13px;}
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important;}
@@ -989,6 +995,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
     <a href="#prices" data-sec="prices" data-cur>Цены</a>
     <a href="#about" data-sec="about" data-cur>О нас</a>
     <a href="#contact" data-sec="contact" data-cur>Контакты</a>
+    <a href="/booking/" class="nav-book" data-cur>Бронь</a>
     <a href="tel:+79060354632" class="nav-tel" data-cur>+7 906 035 46 32</a>
   </div>
   <button id="burger" aria-label="Меню"><span></span><span></span><span></span></button>
@@ -1000,6 +1007,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
   <a href="#prices">Цены</a>
   <a href="#about">О нас</a>
   <a href="#contact">Контакты</a>
+  <a href="/booking/" class="nav-book">Забронировать место</a>
   <a href="tel:+79060354632" class="nav-tel">+7 906 035 46 32</a>
 </div>
 
@@ -1022,7 +1030,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
     <p class="typed"><b>&gt;</b> <span id="typed"></span><span class="caret"></span></p>
     <p class="hero-p">Лучшее круглосуточное место для киберспорта и отдыха в Электростали. <span class="hl">Самые мощные ПК и самые низкие цены</span>, PlayStation 5 и 5 Pro, и, конечно же, очень уютная и современная атмосфера!</p>
     <div class="cta-row">
-      <button class="btn btn-solid" data-open-modal data-mag data-cur>Забронировать место</button>
+      <a class="btn btn-solid" href="/booking/" data-mag data-cur>Забронировать место</a>
       <a href="#prices" class="btn btn-ghost" data-mag data-cur>Наши цены</a>
     </div>
   </div>
@@ -1069,7 +1077,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
           <span class="chip">Наушники Ardor Gaming Карбон</span>
         </div>
         <div class="card-cta">
-          <button class="btn btn-solid small" data-open-modal data-cur>Забронировать</button>
+          <a class="btn btn-solid small" href="/booking/?zone=bootcamp" data-cur>Забронировать</a>
           <a href="#prices" class="btn btn-ghost small" data-cur>Тарифы и цены</a>
         </div>
       </div>
@@ -1090,7 +1098,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
           <span class="chip">Наушники Ardor Gaming Карбон</span>
         </div>
         <div class="card-cta">
-          <button class="btn btn-solid small" data-open-modal data-cur>Забронировать</button>
+          <a class="btn btn-solid small" href="/booking/?zone=normal" data-cur>Забронировать</a>
           <a href="#prices" class="btn btn-ghost small" data-cur>Тарифы и цены</a>
         </div>
       </div>
@@ -1125,7 +1133,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
           <li><span class="k">Расположение</span><span class="v">VIP зона</span></li>
         </ul>
         <div class="card-cta">
-          <button class="btn btn-solid small" data-open-modal data-cur>Забронировать</button>
+          <a class="btn btn-solid small" href="/booking/?zone=ps_vip" data-cur>Забронировать</a>
           <a href="#prices" class="btn btn-ghost small" data-cur>Тарифы и цены</a>
         </div>
       </div>
@@ -1140,7 +1148,7 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
           <li><span class="k">Расположение</span><span class="v">Обычная зона</span></li>
         </ul>
         <div class="card-cta">
-          <button class="btn btn-solid small" data-open-modal data-cur>Забронировать</button>
+          <a class="btn btn-solid small" href="/booking/?zone=ps" data-cur>Забронировать</a>
           <a href="#prices" class="btn btn-ghost small" data-cur>Тарифы и цены</a>
         </div>
       </div>
@@ -1386,24 +1394,6 @@ td .rub{transition:transform .25s cubic-bezier(.2,.7,.2,1),color .25s,text-shado
   <span class="lb-cap"></span>
 </div>
 
-<!-- MODAL -->
-<div id="modal" role="dialog" aria-modal="true" aria-label="Забронировать место">
-  <div class="modal-box">
-    <button class="modal-x" data-cur aria-label="Закрыть">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d4d4ee" stroke-width="2"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>
-    </button>
-    <h3>Забронировать место</h3>
-    <p>Позвоните нам или забронируйте место за пару кликов в нашем Telegram-боте — он покажет свободные окна и цены.</p>
-    <a class="modal-tel" data-cur href="tel:+79060354632">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.6"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"></path></svg>
-      +7 906 035 46 32
-    </a>
-    <a class="btn btn-solid small" data-cur href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"></path></svg>
-      Забронировать в боте
-    </a>
-  </div>
-</div>
 <script>
 (function(){
 "use strict";
@@ -1780,16 +1770,6 @@ if (!RM) document.querySelectorAll('.btn').forEach(function(b){
     b.appendChild(s); setTimeout(function(){ s.remove(); }, 800);
   });
 });
-
-/* ============ MODAL ============ */
-var modal = document.getElementById('modal');
-document.querySelectorAll('[data-open-modal]').forEach(function(b){
-  b.addEventListener('click',function(){ modal.classList.add('open'); document.body.style.overflow='hidden'; });
-});
-function closeModal(){ modal.classList.remove('open'); document.body.style.overflow=''; }
-modal.addEventListener('click',function(e){ if (e.target === modal) closeModal(); });
-modal.querySelector('.modal-x').addEventListener('click',closeModal);
-window.addEventListener('keydown',function(e){ if (e.key === 'Escape') closeModal(); });
 
 /* ============ LIGHTBOX с листанием ============ */
 var lb = document.getElementById('lightbox');

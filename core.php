@@ -236,6 +236,7 @@ function api(string $method, array $params = []): ?array {
 }
 
 function send(int $chat, string $text, ?array $kbRows = null): void {
+    if ($chat < 0) return;   // клиент с сайта (см. site_booking.php): в Telegram ему не написать
     $p = ['chat_id' => $chat, 'text' => $text, 'parse_mode' => 'HTML',
           'disable_web_page_preview' => true];
     if ($kbRows !== null) $p['reply_markup'] = ['inline_keyboard' => $kbRows];

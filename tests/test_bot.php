@@ -20,6 +20,7 @@ register_shutdown_function(function () {
 });
 
 require_once __DIR__ . '/../webhook.php';
+require_once __DIR__ . '/../site_booking.php';
 
 // ── мини-фреймворк ──
 $GLOBALS['t_ok'] = 0;
@@ -506,6 +507,96 @@ foreach ($junk as $i => $up) {
     catch (Throwable $e) { $crashed = "апдейт #$i: " . $e->getMessage(); break; }
 }
 ok('мусорные апдейты не роняют бота', $crashed === null, (string)$crashed);
+
+// ══════════════════════════════════════════════════════════
+group('16. Бронирование с сайта (/booking) — одна база с ботом');
+
+// справочник
+$cfg = site_config();
+is_eq('в справочнике 4 зоны', count($cfg['zones']), 4);
+is_eq('в справочнике 4 тарифа', count($cfg['tariffs']), 4);
+is_eq('дат столько же, сколько у бота', count($cfg['days']), BOOK_DAYS_AHEAD);
+is_eq('первая дата — сегодня', $cfg['days'][0]['date'], (new DateTime('today'))->format('Y-m-d'));
+$bc = array_values(array_filter($cfg['zones'], fn($z) => $z['key'] === 'bootcamp'))[0];
+is_eq('цена «от» для Bootcamp — минимальный киберчас', $bc['from'], 170);
+is_eq('вместимость из ZONES', $bc['cap'], ZONES['bootcamp']['cap']);
+
+// телефоны
+is_eq('телефон 8-ка → 7', site_phone_digits('8 (906) 035-46-32'), '79060354632');
+is_eq('телефон без кода → 7', site_phone_digits('9060354632'), '79060354632');
+is_eq('телефон +7', site_phone_digits('+7 906 035 46 32'), '79060354632');
+is_eq('не телефон → null', site_phone_digits('привет'), null);
+is_eq('короткий → null', site_phone_digits('12345'), null);
+is_eq('красивый формат', site_phone_pretty('79060354632'), '+7 906 035 46 32');
+is_eq('имя чистится', site_clean_name('  Иван   Петров '), 'Иван Петров');
+is_eq('имя из 1 буквы → null', site_clean_name('И'), null);
+
+// окна на завтра: все 24 часа свободны, цены как у бота
+$tom = (new DateTime('today +1 day'))->format('Y-m-d');
+$sl = site_slots('normal', 'kiber', $tom);
+ok('окна возвращаются', $sl['ok'] === true);
+is_eq('на завтра 24 окна', count($sl['slots']), 24);
+is_eq('все окна свободны', min(array_column($sl['slots'], 'free')), ZONES['normal']['cap']);
+$d10 = new DateTime("$tom 10:00");
+is_eq('цена окна 10:00 = calc_price', $sl['slots'][10]['price'], calc_price('normal', 'kiber', $d10, 10));
+$sn = site_slots('ps', 'night', $tom);
+is_eq('ночной тариф — одно окно', count($sn['slots']), 1);
+is_eq('ночное окно в NIGHT_HOUR', $sn['slots'][0]['hour'], NIGHT_HOUR);
+ok('вчера бронировать нельзя', site_slots('normal', 'kiber', (new DateTime('yesterday'))->format('Y-m-d'))['ok'] === false);
+ok('через месяц бронировать нельзя', site_slots('normal', 'kiber', (new DateTime('today +30 day'))->format('Y-m-d'))['ok'] === false);
+ok('чужая зона отклоняется', site_slots('vr', 'kiber', $tom)['ok'] === false);
+
+// бронь
+calls_reset();
+$cnt0 = count(active_bookings('ps'));
+$r = site_book(['zone' => 'ps', 'tariff' => 'tripl', 'date' => $tom, 'hour' => 14,
+                'name' => 'Семён', 'phone' => '+7 (906) 035-46-32']);
+ok('бронь с сайта создаётся', $r['ok'] === true, json_encode($r, JSON_UNESCAPED_UNICODE));
+is_eq('бронь попала в общую таблицу', count(active_bookings('ps')), $cnt0 + 1);
+is_eq('цена как у бота', $r['price'], calc_price('ps', 'tripl', new DateTime("$tom 14:00"), 14));
+$row = db()->query("SELECT * FROM bookings WHERE id={$r['id']}")->fetch(PDO::FETCH_ASSOC);
+ok('user_id клиента сайта отрицательный', (int)$row['user_id'] < 0);
+$su = get_user((int)$row['user_id']);
+is_eq('имя сохранено', $su['real_name'], 'Семён');
+is_eq('телефон сохранён красиво', $su['phone'], '+7 906 035 46 32');
+$adm = array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === 1001);
+ok('админ получил уведомление с пометкой «с сайта»', $adm && str_contains(sent_text(), 'с сайта') && str_contains(sent_text(), 'Семён'));
+ok('клиенту сайта бот в Telegram не пишет', !array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] < 0));
+
+// то же место занято и для бота, и для сайта
+$sl2 = site_slots('ps', 'kiber', $tom);
+is_eq('сайт видит занятое окно 14:00', $sl2['slots'][14]['free'], 0);
+is_eq('сайт видит занятое окно 16:00 (трипл = 3 часа)', $sl2['slots'][16]['free'], 0);
+is_eq('а 17:00 свободно', $sl2['slots'][17]['free'], 1);
+$r2 = site_book(['zone' => 'ps', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 15, 'name' => 'Другой', 'phone' => '79990001122']);
+ok('второго на занятое место сайт не пускает', $r2['ok'] === false && ($r2['code'] ?? '') === 'full');
+is_eq('бот тоже видит, что мест нет', free_seats('ps', new DateTime("$tom 15:00"), 1), 0);
+
+// повторный клиент с тем же телефоном — тот же user_id, имя обновилось
+$r3 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 9, 'name' => 'Семён Ермаков', 'phone' => '89060354632']);
+ok('повторная бронь того же клиента', $r3['ok'] === true);
+$row3 = db()->query("SELECT * FROM bookings WHERE id={$r3['id']}")->fetch(PDO::FETCH_ASSOC);
+is_eq('тот же клиент → тот же user_id', (int)$row3['user_id'], (int)$row['user_id']);
+is_eq('имя обновилось на последнее', get_user((int)$row['user_id'])['real_name'], 'Семён Ермаков');
+
+// лимит активных броней на телефон
+$r4 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 11, 'name' => 'Семён', 'phone' => '79060354632']);
+ok('третья бронь ещё проходит', $r4['ok'] === true);
+$r5 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 12, 'name' => 'Семён', 'phone' => '79060354632']);
+ok('четвёртая активная бронь на один телефон не проходит', $r5['ok'] === false && str_contains($r5['error'], 'активные'));
+
+// валидация
+ok('прошедшее время отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => (new DateTime('today'))->format('Y-m-d'), 'hour' => max(0, (int)date('G') - 1), 'name' => 'Тест', 'phone' => '79990000001'])['ok'] === false || (int)date('G') === 0);
+ok('ночной тариф не в 20:00 отклоняется', site_book(['zone' => 'normal', 'tariff' => 'night', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => '79990000002'])['ok'] === false);
+ok('без имени отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => '', 'phone' => '79990000003'])['ok'] === false);
+ok('без телефона отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => 'нет'])['ok'] === false);
+ok('ночь бронируется в 20:00', site_book(['zone' => 'bootcamp', 'tariff' => 'night', 'date' => $tom, 'hour' => NIGHT_HOUR, 'name' => 'Ночной', 'phone' => '79990000004'])['ok'] === true);
+
+// бронь с сайта видна в админке бота
+calls_reset();
+handle_update(['callback_query' => ['id' => 'x', 'from' => ['id' => 1001],
+    'message' => ['message_id' => 1, 'chat' => ['id' => 1001]], 'data' => 'adm:all']]);
+ok('бронь с сайта видна в «все брони» админки', str_contains(sent_text(), 'Семён'));
 
 // ══════════════════════════════════════════════════════════
 // ИТОГ
