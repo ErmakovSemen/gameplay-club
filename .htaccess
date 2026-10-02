@@ -8,6 +8,9 @@
 <Files "site_booking.php">
     Require all denied
 </Files>
+<Files "privacy_cleanup.php">
+    Require all denied
+</Files>
 <Files "config.php">
     Require all denied
 </Files>
@@ -21,3 +24,4 @@
 </FilesMatch>
 RedirectMatch 404 /\.git
 RedirectMatch 404 /tests/
+RedirectMatch 404 /docs/

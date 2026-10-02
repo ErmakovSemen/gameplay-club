@@ -21,6 +21,7 @@ register_shutdown_function(function () {
 
 require_once __DIR__ . '/../webhook.php';
 require_once __DIR__ . '/../site_booking.php';
+require_once __DIR__ . '/../privacy_cleanup.php';
 
 // ── мини-фреймворк ──
 $GLOBALS['t_ok'] = 0;
@@ -168,7 +169,12 @@ as_click($uid, 'date:' . $day);
 ok('шаг 4 — выбор часа', str_contains(sent_text(), 'Шаг 4 из 4'));
 
 as_click($uid, 'hour:14');
-ok('спрашивает телефон', str_contains(sent_text(), 'телефон'));
+ok('сначала просит согласие на обработку данных', str_contains(sent_text(), 'Согласие на обработку'));
+ok('в запросе согласия есть ссылки на документы', str_contains(sent_text(), '/consent/') && str_contains(sent_text(), '/privacy/'));
+ok('согласия ещё нет', !has_consent($uid));
+as_click($uid, 'pdc:yes');
+ok('согласие записано', has_consent($uid));
+ok('после согласия спрашивает телефон', str_contains(sent_text(), 'телефон'));
 
 as_message($uid, '123');
 ok('короткий номер отклонён', str_contains(sent_text(), 'не номер'));
@@ -227,6 +233,7 @@ group('6. Защита от двойной брони');
 
 $uid2 = 5001;
 save_user($uid2, 'Второй');
+record_consent($uid2, 'bot');
 set_user($uid2, 'phone', '+70000000000');
 set_user($uid2, 'real_name', 'Второй Игрок');
 
@@ -312,6 +319,7 @@ group('9. Ночной тариф');
 $uid3 = 6001;
 save_user($uid3, 'Ночной');
 set_user($uid3, 'phone', '+71111111111');
+record_consent($uid3, 'bot');
 set_user($uid3, 'real_name', 'Ночной Игрок');
 $night_date = (new DateTime('tomorrow'))->format('Y-m-d');
 set_draft($uid3, ['zone' => 'bootcamp', 'tariff' => 'night', 'date' => $night_date]);
@@ -437,6 +445,7 @@ ok('битый черновик не создаёт бронь', str_contains(se
 $past = (new DateTime())->modify('-3 hours');
 save_user(7502, 'Опоздал');
 set_user(7502, 'phone', '+70000000001');
+record_consent(7502, 'bot');
 set_user(7502, 'real_name', 'Опоздавший');
 set_draft(7502, ['zone' => 'normal', 'tariff' => 'kiber',
                  'date' => $past->format('Y-m-d'), 'hour' => (int)$past->format('H')]);
@@ -549,7 +558,7 @@ ok('чужая зона отклоняется', site_slots('vr', 'kiber', $tom)
 // бронь
 calls_reset();
 $cnt0 = count(active_bookings('ps'));
-$r = site_book(['zone' => 'ps', 'tariff' => 'tripl', 'date' => $tom, 'hour' => 14,
+$r = site_book(['consent' => true, 'zone' => 'ps', 'tariff' => 'tripl', 'date' => $tom, 'hour' => 14,
                 'name' => 'Семён', 'phone' => '+7 (906) 035-46-32']);
 ok('бронь с сайта создаётся', $r['ok'] === true, json_encode($r, JSON_UNESCAPED_UNICODE));
 is_eq('бронь попала в общую таблицу', count(active_bookings('ps')), $cnt0 + 1);
@@ -568,29 +577,29 @@ $sl2 = site_slots('ps', 'kiber', $tom);
 is_eq('сайт видит занятое окно 14:00', $sl2['slots'][14]['free'], 0);
 is_eq('сайт видит занятое окно 16:00 (трипл = 3 часа)', $sl2['slots'][16]['free'], 0);
 is_eq('а 17:00 свободно', $sl2['slots'][17]['free'], 1);
-$r2 = site_book(['zone' => 'ps', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 15, 'name' => 'Другой', 'phone' => '79990001122']);
+$r2 = site_book(['consent' => true, 'zone' => 'ps', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 15, 'name' => 'Другой', 'phone' => '79990001122']);
 ok('второго на занятое место сайт не пускает', $r2['ok'] === false && ($r2['code'] ?? '') === 'full');
 is_eq('бот тоже видит, что мест нет', free_seats('ps', new DateTime("$tom 15:00"), 1), 0);
 
 // повторный клиент с тем же телефоном — тот же user_id, имя обновилось
-$r3 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 9, 'name' => 'Семён Ермаков', 'phone' => '89060354632']);
+$r3 = site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 9, 'name' => 'Семён Ермаков', 'phone' => '89060354632']);
 ok('повторная бронь того же клиента', $r3['ok'] === true);
 $row3 = db()->query("SELECT * FROM bookings WHERE id={$r3['id']}")->fetch(PDO::FETCH_ASSOC);
 is_eq('тот же клиент → тот же user_id', (int)$row3['user_id'], (int)$row['user_id']);
 is_eq('имя обновилось на последнее', get_user((int)$row['user_id'])['real_name'], 'Семён Ермаков');
 
 // лимит активных броней на телефон
-$r4 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 11, 'name' => 'Семён', 'phone' => '79060354632']);
+$r4 = site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 11, 'name' => 'Семён', 'phone' => '79060354632']);
 ok('третья бронь ещё проходит', $r4['ok'] === true);
-$r5 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 12, 'name' => 'Семён', 'phone' => '79060354632']);
+$r5 = site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 12, 'name' => 'Семён', 'phone' => '79060354632']);
 ok('четвёртая активная бронь на один телефон не проходит', $r5['ok'] === false && str_contains($r5['error'], 'активные'));
 
 // валидация
-ok('прошедшее время отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => (new DateTime('today'))->format('Y-m-d'), 'hour' => max(0, (int)date('G') - 1), 'name' => 'Тест', 'phone' => '79990000001'])['ok'] === false || (int)date('G') === 0);
-ok('ночной тариф не в 20:00 отклоняется', site_book(['zone' => 'normal', 'tariff' => 'night', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => '79990000002'])['ok'] === false);
-ok('без имени отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => '', 'phone' => '79990000003'])['ok'] === false);
-ok('без телефона отклоняется', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => 'нет'])['ok'] === false);
-ok('ночь бронируется в 20:00', site_book(['zone' => 'bootcamp', 'tariff' => 'night', 'date' => $tom, 'hour' => NIGHT_HOUR, 'name' => 'Ночной', 'phone' => '79990000004'])['ok'] === true);
+ok('прошедшее время отклоняется', site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => (new DateTime('today'))->format('Y-m-d'), 'hour' => max(0, (int)date('G') - 1), 'name' => 'Тест', 'phone' => '79990000001'])['ok'] === false || (int)date('G') === 0);
+ok('ночной тариф не в 20:00 отклоняется', site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'night', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => '79990000002'])['ok'] === false);
+ok('без имени отклоняется', site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => '', 'phone' => '79990000003'])['ok'] === false);
+ok('без телефона отклоняется', site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom, 'hour' => 10, 'name' => 'Тест', 'phone' => 'нет'])['ok'] === false);
+ok('ночь бронируется в 20:00', site_book(['consent' => true, 'zone' => 'bootcamp', 'tariff' => 'night', 'date' => $tom, 'hour' => NIGHT_HOUR, 'name' => 'Ночной', 'phone' => '79990000004'])['ok'] === true);
 
 // бронь с сайта видна в админке бота
 calls_reset();
@@ -621,6 +630,89 @@ if ($bh !== false && preg_match('#<script type="application/json" id="gp-cfg">(.
 } else {
     ok('в booking/index.html есть блок gp-cfg', false);
 }
+
+// ══════════════════════════════════════════════════════════
+group('18. Персональные данные: согласие, сроки, удаление');
+
+$tom2 = (new DateTime('today +2 day'))->format('Y-m-d');
+$nc = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom2, 'hour' => 10, 'name' => 'Без Согласия', 'phone' => '79995550001']);
+ok('без согласия бронь с сайта не создаётся', $nc['ok'] === false && ($nc['code'] ?? '') === 'consent');
+$nc2 = site_book(['consent' => 'yes', 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom2, 'hour' => 10, 'name' => 'Строка', 'phone' => '79995550002']);
+ok('согласие принимается только как явное true', $nc2['ok'] === false);
+is_eq('несогласный гость не попал в базу', (int)db()->query("SELECT COUNT(*) FROM users WHERE phone='+7 999 555 00 01'")->fetchColumn(), 0);
+$yc = site_book(['consent' => true, 'zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom2, 'hour' => 10, 'name' => 'Согласный', 'phone' => '79995550003']);
+ok('с согласием бронь создаётся', $yc['ok'] === true);
+$yuid = (int)db()->query("SELECT user_id FROM bookings WHERE id={$yc['id']}")->fetchColumn();
+ok('согласие гостя сайта записано', has_consent($yuid));
+is_eq('источник согласия — site', db()->query("SELECT source FROM consents WHERE user_id=$yuid")->fetchColumn(), 'site');
+is_eq('записана текущая редакция', db()->query("SELECT version FROM consents WHERE user_id=$yuid")->fetchColumn(), PD_CONSENT_VERSION);
+
+// бот: подтверждение без согласия не проходит
+$ub = 7801; save_user($ub, 'Хитрый'); set_user($ub, 'phone', '+79990007801'); set_user($ub, 'real_name', 'Хитрый');
+set_draft($ub, ['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tom2, 'hour' => 15]);
+$cntb = count(active_bookings('normal'));
+as_click($ub, 'confirm');
+is_eq('бот не создаёт бронь без согласия', count(active_bookings('normal')), $cntb);
+ok('бот вместо этого просит согласие', str_contains(sent_text(), 'Согласие на обработку'));
+as_click($ub, 'pdc:yes');
+ok('после согласия бот показывает подтверждение', str_contains(sent_text(), 'Проверь бронь'));
+
+// удаление по запросу (отзыв согласия)
+$found = pd_find_by_phone('8 (999) 555-00-03');
+is_eq('гость находится по телефону в любом формате', $found, [$yuid]);
+pd_anonymize($yuid);
+$au = get_user($yuid);
+ok('телефон удалён', $au['phone'] === null);
+ok('имя удалено', $au['real_name'] === null);
+ok('согласие удалено', !has_consent($yuid));
+is_eq('будущая бронь снята', db()->query("SELECT status FROM bookings WHERE id={$yc['id']}")->fetchColumn(), 'cancelled');
+ok('бронь осталась для учёта', (bool)db()->query("SELECT 1 FROM bookings WHERE id={$yc['id']}")->fetchColumn());
+
+// срок хранения
+$old = -900001;
+db()->prepare('INSERT INTO users (id, name, real_name, phone, created) VALUES (?,?,?,?,?)')->execute([$old, 'site', 'Старый', '+7 999 000 00 09', '2020-01-01T10:00:00+03:00']);
+add_booking($old, 'normal', '2021-05-01T12:00:00+03:00', 1, 'kiber', 120);
+$fresh = -900002;
+db()->prepare('INSERT INTO users (id, name, real_name, phone, created) VALUES (?,?,?,?,?)')->execute([$fresh, 'site', 'Свежий', '+7 999 000 00 08', '2020-01-01T10:00:00+03:00']);
+add_booking($fresh, 'normal', (new DateTime('-30 day'))->format('c'), 1, 'kiber', 120);
+$exp = pd_expired_users();
+ok('давний гость попадает под обезличивание', in_array($old, $exp, true));
+ok('недавний гость — нет', !in_array($fresh, $exp, true));
+ok('гость с бронью завтра — нет', !in_array((int)db()->query("SELECT user_id FROM bookings WHERE status='active' AND start > '" . date('c') . "' LIMIT 1")->fetchColumn(), $exp, true));
+
+// юридические страницы на месте и связаны
+$root = __DIR__ . '/..';
+foreach (['privacy', 'consent', 'terms', 'refund', 'cookies'] as $pg) {
+    $h = @file_get_contents("$root/$pg/index.html");
+    ok("страница /$pg/ существует", $h !== false && str_contains($h, '<html lang="ru">'));
+}
+$main = file_get_contents("$root/index.html");
+$book = file_get_contents("$root/booking/index.html");
+foreach (['privacy', 'consent', 'terms', 'refund', 'cookies'] as $pg) {
+    ok("главная ссылается на /$pg/", (bool)preg_match('#href="(\.\./|/)?' . $pg . '/"#', $main));
+}
+ok('в форме брони есть галочка согласия', (bool)preg_match('#<input[^>]+id="fConsent"[^>]*type="checkbox"#', $book) || (bool)preg_match('#<input[^>]+type="checkbox"[^>]+id="fConsent"#', $book));
+ok('галочка согласия не отмечена заранее', !preg_match('#<input[^>]*id="fConsent"[^>]*\bchecked\b#', $book));
+ok('форма ссылается на отдельный документ согласия', str_contains($book, '../consent/'));
+ok('«запомнить» по умолчанию выключено', !preg_match('#<input[^>]*id="fRemember"[^>]*\bchecked\b#', $book));
+
+// третьи стороны: шрифты, скрипты и аналитика не грузятся с чужих серверов
+foreach (['главная' => $main, 'бронь' => $book] as $nm => $h) {
+    ok("$nm: нет Google Fonts", !str_contains($h, 'fonts.googleapis.com') && !str_contains($h, 'fonts.gstatic.com'));
+    ok("$nm: нет внешних скриптов", !preg_match('#<script[^>]+src="https?://#i', $h));
+    ok("$nm: нет счётчиков аналитики", !preg_match('#mc\.yandex|metrika|googletagmanager|google-analytics|gtag\(|fbq\(#i', $h));
+    ok("$nm: нет «самые низкие цены» и «лучшее»", !preg_match('#самы[ех] (низк|мощн)|лучш(ее|ие|ий)#iu', strip_tags($h)));
+}
+ok('карта Яндекса не встроена сразу (грузится по кнопке)', !preg_match('#<iframe[^>]+yandex#i', $main));
+
+// реквизиты: пока есть незаполненные поля, выкладывать нельзя
+$fills = [];
+foreach (array_merge(['index.html', 'booking/index.html'], array_map(fn($p) => "$p/index.html", ['privacy', 'consent', 'terms', 'refund', 'cookies'])) as $f) {
+    $h = file_get_contents("$root/$f");
+    if (preg_match_all('#data-fill="([a-z]+)"#', $h, $mm)) foreach ($mm[1] as $k) $fills[$k][] = $f;
+}
+ok('все реквизиты и условия заполнены (нет полей data-fill)', !$fills,
+    $fills ? 'заполни: ' . implode(', ', array_map(fn($k, $v) => "$k (" . implode(', ', array_unique($v)) . ')', array_keys($fills), $fills)) : '');
 
 // ══════════════════════════════════════════════════════════
 // ИТОГ

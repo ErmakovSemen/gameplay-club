@@ -63,6 +63,7 @@ rsync -avz --human-readable --progress "${SSH_OPT[@]}" "${RSYNC_PATH[@]}" "$@" \
     --exclude '.claude/' \
     --exclude '.DS_Store' \
     --exclude 'tests/' \
+    --exclude 'docs/' \
     --exclude 'deploy.sh' \
     --exclude 'README.md' \
     --exclude 'config.php' \
@@ -84,4 +85,6 @@ cat <<'EOF'
        https://ВАШ-ДОМЕН/set_webhook.php?key=CRON_KEY
   4. Cron каждые 5 минут:
        */5 * * * * php /путь/к/сайту/reminder.php
+  5. Cron раз в сутки — сроки хранения персональных данных:
+       15 4 * * * php /путь/к/сайту/privacy_cleanup.php
 EOF

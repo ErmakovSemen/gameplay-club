@@ -66,6 +66,7 @@ server {
     location = /config.example.php { deny all; }
     location = /core.php           { deny all; }
     location = /site_booking.php   { deny all; }
+    location = /privacy_cleanup.php { deny all; }
     location = /deploy.sh          { deny all; }
     location = /server_setup.sh    { deny all; }
     location = /cert_check.php     { deny all; }
@@ -76,6 +77,7 @@ server {
     location ~ ^/\.cert_check_state { deny all; }
     location ^~ /tests/            { deny all; }
     location ^~ /nginx/            { deny all; }
+    location ^~ /docs/             { deny all; }
     location ^~ /.git              { deny all; }
     location ~ /\.                 { deny all; }
     location ~ \.(db|db-wal|db-shm)$ { deny all; }

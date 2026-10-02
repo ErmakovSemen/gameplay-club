@@ -190,6 +190,8 @@ function site_book(array $in): array {
                                      return ['ok' => false, 'error' => 'Выберите время'];
     if ($name === null)              return ['ok' => false, 'error' => 'Напишите имя — от 2 до 40 символов'];
     if ($digits === null)            return ['ok' => false, 'error' => 'Похоже, это не номер телефона'];
+    if (($in['consent'] ?? null) !== true)
+                                     return ['ok' => false, 'error' => 'Отметьте согласие на обработку персональных данных', 'code' => 'consent'];
     $hour = (int)$hour;
     if ($tariff === 'night' && $hour !== NIGHT_HOUR)
                                      return ['ok' => false, 'error' => 'Ночной тариф начинается в ' . NIGHT_HOUR . ':00'];
@@ -219,6 +221,7 @@ function site_book(array $in): array {
             return ['ok' => false, 'error' => 'Место только что заняли. Выберите другое время', 'code' => 'full'];
         }
         $bid = add_booking($uid, $zone, $start->format('c'), $hours, $tariff, $price);
+        record_consent($uid, 'site');
         db()->exec('COMMIT');
     } catch (Throwable $e) {
         db()->exec('ROLLBACK');

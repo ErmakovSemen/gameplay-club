@@ -35,6 +35,15 @@ const CLUB_PHONE   = '+7 906 035 46 32';
 const CLUB_SITE    = 'https://gameplaycc.ru';
 const CLUB_CHANNEL = 'https://t.me/gameplaypcclub';
 const CLUB_ADDRESS = 'г. Электросталь, проспект Ленина, 40/8';
+const CLUB_EMAIL   = 'Game.Play.CC@yandex.ru';
+
+// ══════════ ПЕРСОНАЛЬНЫЕ ДАННЫЕ (152-ФЗ) ══════════
+// Редакция текста согласия (/consent/). Меняешь текст согласия — меняй и версию:
+// так в базе видно, какую редакцию принял каждый гость.
+const PD_CONSENT_VERSION = '2026-10-02';
+const PD_PRIVACY_URL     = CLUB_SITE . '/privacy/';
+const PD_CONSENT_URL     = CLUB_SITE . '/consent/';
+const PD_RETENTION_YEARS = 3;   // после последней брони имя и телефон обезличиваются (privacy_cleanup.php)
 
 const DAY_START       = 8;   // «День»  = старт с 8:00 до 15:59
 const EVENING_START   = 16;  // «Вечер» = старт с 16:00 (и до 7:59 утра)
@@ -103,8 +112,24 @@ function db(): PDO {
             zone TEXT NOT NULL, start TEXT NOT NULL, hours INTEGER NOT NULL,
             tariff TEXT NOT NULL, price INTEGER NOT NULL,
             status TEXT DEFAULT 'active', reminded INTEGER DEFAULT 0, created TEXT)");
+        // согласия на обработку ПДн: кто, когда, какую редакцию, откуда (bot / site)
+        $pdo->exec('CREATE TABLE IF NOT EXISTS consents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+            version TEXT NOT NULL, source TEXT NOT NULL, ts TEXT NOT NULL)');
     }
     return $pdo;
+}
+
+function has_consent(int $uid): bool {
+    $st = db()->prepare('SELECT 1 FROM consents WHERE user_id=? AND version=? LIMIT 1');
+    $st->execute([$uid, PD_CONSENT_VERSION]);
+    return (bool)$st->fetchColumn();
+}
+
+function record_consent(int $uid, string $source): void {
+    if (has_consent($uid)) return;
+    db()->prepare('INSERT INTO consents (user_id, version, source, ts) VALUES (?,?,?,?)')
+        ->execute([$uid, PD_CONSENT_VERSION, $source, date('c')]);
 }
 
 function get_user(int $uid): ?array {

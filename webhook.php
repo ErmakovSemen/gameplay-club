@@ -36,7 +36,7 @@ function main_menu_text(): string {
         . "<i>Игровой клуб · Электросталь · 24/7</i>\n" . DIV . "\n"
         . "🖥 Мощные ПК: RTX 3060 и RTX 5060\n"
         . "🎮 PlayStation 5 и PS5 Pro\n"
-        . "💜 Уютная атмосфера и лучшие цены\n"
+        . "💜 Уютная атмосфера, цены — от 120 ₽ в час\n"
         . "☎️ " . CLUB_PHONE . "\n"
         . '🌐 <a href="' . CLUB_SITE . '">Наш сайт</a>' . "\n"
         . '📣 <a href="' . CLUB_CHANNEL . '">Наш канал</a>' . "\n"
@@ -138,7 +138,8 @@ function view_info(): array {
         . "🎮 <b>PS5</b> (1 ТБ) · ТВ 55″ 120 Гц\n"
         . "👑 <b>PS5 Pro</b> (2 ТБ) · ТВ 65″ 120 Гц · VIP зона\n" . DIV . "\n"
         . "🕐 Работаем <b>24/7</b>\n📍 " . CLUB_ADDRESS . "\n☎️ " . CLUB_PHONE . "\n"
-        . "🌐 Сайт: gameplaycc.ru\n📣 Канал: @gameplaypcclub";
+        . "🌐 Сайт: gameplaycc.ru\n📣 Канал: @gameplaypcclub\n"
+        . '📄 <a href="' . PD_PRIVACY_URL . '">Конфиденциальность</a> · <a href="' . CLUB_SITE . '/terms/">Условия</a>';
     return [$text, [[btn('🎮 Забронировать', 'book')], [btn('⬅️ Назад', 'menu')]]];
 }
 
@@ -214,8 +215,25 @@ function show_hours(int $chat, int $msgId, string $cbId, array $d): void {
         . DIV . "\nШаг 4 из 4 · Выбери время начала:\n<i>✖ — мест нет</i>", $rows);
 }
 
+function consent_text(): string {
+    return "📄 <b>Согласие на обработку данных</b>\n" . DIV . "\n"
+        . "Чтобы записать бронь, нам нужны твоё имя и номер телефона — по ним администратор найдёт бронь в клубе.\n\n"
+        . 'Нажимая «Даю согласие», ты соглашаешься на их обработку на условиях '
+        . '<a href="' . PD_CONSENT_URL . '">согласия</a> и <a href="' . PD_PRIVACY_URL . '">политики конфиденциальности</a>.';
+}
+
+function consent_kb(): array {
+    return [[btn('✅ Даю согласие', 'pdc:yes')], [btn('❌ Не сейчас', 'menu')]];
+}
+
 function ask_details_or_confirm(int $chat, ?int $msgId, ?string $cbId): void {
     $u = get_user($chat);
+    if (!has_consent($chat)) {
+        set_user($chat, 'state', 'consent');
+        if ($msgId) edit($chat, $msgId, consent_text(), consent_kb()); else send($chat, consent_text(), consent_kb());
+        if ($cbId) answer_cb($cbId);
+        return;
+    }
     if (!$u || !$u['phone']) {
         set_user($chat, 'state', 'phone');
         $text = "📱 <b>Почти готово!</b>\n" . DIV . "\n"
@@ -258,6 +276,7 @@ function show_confirm(int $chat, ?int $msgId): void {
 function do_confirm(int $chat, int $msgId, string $cbId): void {
     $d = get_draft($chat);
     if (!draft_valid($d)) { answer_cb($cbId, 'Сессия устарела, начни заново', true); return; }
+    if (!has_consent($chat)) { ask_details_or_confirm($chat, $msgId, $cbId); return; }
     $hours = TARIFFS[$d['tariff']][1];
     $start = new DateTime(sprintf('%s %02d:00', $d['date'], $d['hour']));
     if ($start < new DateTime()) {
@@ -570,6 +589,13 @@ function handle_callback(array $cb): void {
     if ($data === 'my') { [$t, $k] = view_my($uid); edit($chat, $msgId, $t, $k); answer_cb($cbId); return; }
     if ($data === 'info') { [$t, $k] = view_info(); edit($chat, $msgId, $t, $k); answer_cb($cbId); return; }
     if ($data === 'full') { answer_cb($cbId, 'На это время всё занято 😔'); return; }
+    if ($data === 'pdc:yes') {
+        record_consent($uid, 'bot');
+        set_user($uid, 'state', null);
+        if (draft_valid(get_draft($uid))) { ask_details_or_confirm($chat, $msgId, $cbId); }
+        else { answer_cb($cbId, 'Спасибо! Теперь можно бронировать'); edit($chat, $msgId, main_menu_text(), main_menu_kb()); }
+        return;
+    }
 
     // поток бронирования
     if (str_starts_with($data, 'zone:')) {
