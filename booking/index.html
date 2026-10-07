@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=113524983', 'ym');
+
+    ym(113524983, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Забронировать место — Game Play, игровой клуб в Электростали</title>
@@ -301,6 +311,7 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
 </style>
 </head>
 <body>
+<noscript><div><img src="https://mc.yandex.ru/watch/113524983" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <a class="skip" href="#steps">Перейти к бронированию</a>
 <div class="bg" aria-hidden="true"><canvas id="stars"></canvas></div>
 
@@ -364,8 +375,8 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
         </div>
         <div class="step-body">
           <form id="form" class="form" novalidate autocomplete="on">
-            <div class="field"><label for="fName">Имя</label><input id="fName" name="name" type="text" placeholder="Как вас записать" maxlength="40" autocomplete="name" required /></div>
-            <div class="field"><label for="fPhone">Телефон</label><input id="fPhone" name="phone" type="tel" inputmode="tel" placeholder="+7 ___ ___ __ __" autocomplete="tel" required /></div>
+            <div class="field"><label for="fName">Имя</label><input class="ym-disable-keys" id="fName" name="name" type="text" placeholder="Как вас записать" maxlength="40" autocomplete="name" required /></div>
+            <div class="field"><label for="fPhone">Телефон</label><input class="ym-disable-keys" id="fPhone" name="phone" type="tel" inputmode="tel" placeholder="+7 ___ ___ __ __" autocomplete="tel" required /></div>
             <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
           </form>
           <p class="hint" id="whyHint">Имя и телефон нужны только для брони: по ним администратор найдёт её в клубе. Без рассылок.</p>
@@ -685,6 +696,15 @@ function submit(){
       $('dId').textContent = '#' + d.id; $('dZone').textContent = d.zone; $('dTariff').textContent = d.tariff;
       $('dWhen').textContent = d.when + ' → ' + d.until; $('dPrice').textContent = fmtPrice(d.price);
       openDone();
+      // Only a confirmed booking is a conversion; booking price is not paid revenue.
+      try {
+        if (Number(d.id) > 0 && typeof window.ym === 'function') {
+          window.ym(113524983, 'reachGoal', 'booking_success', {
+            booking_id: String(d.id), zone: sel.zone, tariff: sel.tariff
+          });
+        }
+      } catch (analyticsError) { /* Analytics must not interrupt booking confirmation. */ }
+
       try { if ($('fRemember').checked) localStorage.setItem('gp_contact', JSON.stringify({ name:name, phone:phone })); else localStorage.removeItem('gp_contact'); } catch(e){}
     })
     .catch(function(){ btns.forEach(function(b){ b.classList.remove('busy'); }); showMsg('Нет связи с сервером. Попробуйте ещё раз или позвоните: ' + cfg.phone); });

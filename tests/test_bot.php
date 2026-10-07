@@ -696,11 +696,12 @@ ok('галочка согласия не отмечена заранее', !preg
 ok('форма ссылается на отдельный документ согласия', str_contains($book, '../consent/'));
 ok('«запомнить» по умолчанию выключено', !preg_match('#<input[^>]*id="fRemember"[^>]*\bchecked\b#', $book));
 
-// третьи стороны: шрифты, скрипты и аналитика не грузятся с чужих серверов
+// Шрифты и библиотечные скрипты локальные; разрешён один счётчик Яндекс.Метрики.
 foreach (['главная' => $main, 'бронь' => $book] as $nm => $h) {
     ok("$nm: нет Google Fonts", !str_contains($h, 'fonts.googleapis.com') && !str_contains($h, 'fonts.gstatic.com'));
     ok("$nm: нет внешних скриптов", !preg_match('#<script[^>]+src="https?://#i', $h));
-    ok("$nm: нет счётчиков аналитики", !preg_match('#mc\.yandex|metrika|googletagmanager|google-analytics|gtag\(|fbq\(#i', $h));
+    ok("$nm: один разрешённый счётчик Метрики", substr_count($h, "ym(113524983, 'init'") === 1 && str_contains($h, 'https://mc.yandex.ru/metrika/tag.js?id=113524983'));
+    ok("$nm: нет других рекламных трекеров", !preg_match('#googletagmanager|google-analytics|gtag\(|fbq\(#i', $h));
     ok("$nm: нет «самые низкие цены» и «лучшее»", !preg_match('#самы[ех] (низк|мощн)|лучш(ее|ие|ий)#iu', strip_tags($h)));
 }
 ok('карта Яндекса не встроена сразу (грузится по кнопке)', !preg_match('#<iframe[^>]+yandex#i', $main));
