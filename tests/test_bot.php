@@ -704,7 +704,28 @@ foreach (['главная' => $main, 'бронь' => $book] as $nm => $h) {
     ok("$nm: нет других рекламных трекеров", !preg_match('#googletagmanager|google-analytics|gtag\(|fbq\(#i', $h));
     ok("$nm: нет «самые низкие цены» и «лучшее»", !preg_match('#самы[ех] (низк|мощн)|лучш(ее|ие|ий)#iu', strip_tags($h)));
 }
-ok('карта Яндекса не встроена сразу (грузится по кнопке)', !preg_match('#<iframe[^>]+yandex#i', $main));
+ok('карта Яндекса видна сразу (iframe с ленивой загрузкой)', (bool)preg_match('#<iframe[^>]+map-widget[^>]+loading="lazy"#i', $main));
+ok('карта в тёмной гамме', str_contains($main, '.map-frame iframe{filter:invert('));
+
+// Метрика — только после согласия в окне cookie
+foreach (['главная' => $main, 'бронь' => $book] as $nm => $h) {
+    $headJs = substr($h, 0, strpos($h, '</head>'));
+    ok("$nm: init Метрики только внутри gpLoadMetrika()", (bool)preg_match("#gpLoadMetrika = function\(\)\{.*ym\(113524983, 'init'#s", $headJs));
+    ok("$nm: автозагрузка — только при сохранённом «yes»", str_contains($headJs, "localStorage.getItem('gp_cookie_v1') === 'yes'"));
+    ok("$nm: нет noscript-пикселя без согласия", !str_contains($h, 'mc.yandex.ru/watch'));
+    ok("$nm: есть окно согласия с «Принять» и «Только необходимые»", str_contains($h, 'id="ccYes"') && str_contains($h, 'id="ccNo"') && str_contains($h, '/cookies/'));
+}
+$ck = file_get_contents("$root/cookies/index.html");
+ok('политика cookie описывает Метрику и не говорит, что аналитики нет', str_contains($ck, 'Яндекс Метрика') && !preg_match('#не подключены|не собирает аналитику#u', $ck));
+ok('на странице cookie можно отозвать согласие', str_contains($ck, 'id="ccReset"'));
+$pv = file_get_contents("$root/privacy/index.html");
+ok('политика ПД называет ООО «ЯНДЕКС» получателем данных Метрики', str_contains($pv, 'ООО «ЯНДЕКС»') && str_contains($pv, 'Яндекс Метрика'));
+
+// главная: правки интерфейса
+ok('нет боковых точек-навигации', !str_contains($main, 'id="dots"'));
+ok('лента не останавливается при наведении', !str_contains($main, 'animation-play-state:paused'));
+ok('у некликабельных элементов нет эффектов наведения', !preg_match('#\.(?:card|chip|tbl-card|stat|specs li|tariff-note \.tn)(?:[^{,]*)?:hover|\.perks \.feat:hover#', $main));
+ok('плавающая кнопка брони ведёт на /booking/', (bool)preg_match('#<div id="fab">\s*<a class="fab-main" href="/booking/"#', $main));
 
 // реквизиты: пока есть незаполненные поля, выкладывать нельзя
 $fills = [];

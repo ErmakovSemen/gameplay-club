@@ -86,26 +86,46 @@ footer a:hover,footer a[aria-current]{color:var(--storm)}
     <span class="eyebrow">Документ</span>
     <h1>Политика <em>cookie</em></h1>
     <p class="lead">Коротко: сайт не ставит cookie, не подключает аналитику и рекламные счётчики. Поэтому баннера о cookie нет.</p>
-    <div class="ed"><span>Редакция от 2 октября 2026 г.</span></div>
+    <div class="ed"><span>Редакция от 7 октября 2026 г.</span></div>
   </header>
   <div class="layout">
     <aside class="toc" aria-label="Содержание"><b>Содержание</b><a href="#s1">Что используется на сайте</a><a href="#s2">Карта Яндекса</a><a href="#s3">Нужно ли согласие на cookie</a></aside>
     <div class="doc"><section class="sec" id="s1" aria-labelledby="h1"><h2 id="h1"><i aria-hidden="true">01</i>Что используется на сайте</h2>
 <ul>
-<li><b>Собственные cookie</b> — не используются.</li>
-<li><b>Веб-аналитика и рекламные трекеры</b> (Яндекс Метрика, Google Analytics, пиксели соцсетей и т. п.) — не подключены.</li>
+<li><b>Яндекс Метрика</b> — веб-аналитика сервиса ООО «ЯНДЕКС» (Россия). <b>Включается только после того, как вы нажмёте «Принять»</b> в окне внизу страницы. Ставит свои cookie (например, <code style="font-family:var(--mono);font-size:.92em;color:var(--plasma)">_ym_uid</code>, <code style="font-family:var(--mono);font-size:.92em;color:var(--plasma)">_ym_d</code>, <code style="font-family:var(--mono);font-size:.92em;color:var(--plasma)">_ym_isad</code>, <code style="font-family:var(--mono);font-size:.92em;color:var(--plasma)">_ym_visorc</code>) сроком до 1 года и собирает: обезличенный идентификатор браузера, IP-адрес, сведения об устройстве и браузере, откуда вы пришли, какие страницы открыли и что на них делали (карта кликов, Вебвизор — запись действий на странице). Содержимое полей «Имя» и «Телефон» в запись не попадает. Мы смотрим общую статистику посещений и успешных броней и используем её для оценки и настройки рекламы клуба в Яндексе. Обработка — по <a href="https://yandex.ru/legal/metrica_termsofuse/" target="_blank" rel="noopener">условиям Яндекс Метрики</a>.</li>
+<li><b>Память браузера (localStorage) — необходимые сведения.</b> Сайт запоминает ваш выбор в окне cookie (<code style="font-family:var(--mono);font-size:.92em;color:var(--plasma)">gp_cookie_v1</code>), чтобы не спрашивать снова. Страница бронирования сохраняет имя и телефон на вашем устройстве, только если вы отметили «Запомнить на этом устройстве». На сервер это не отправляется.</li>
 <li><b>Шрифты, 3D-графика и картинки</b> загружаются с нашего сервера — сторонние сервисы о вашем визите не узнают.</li>
-<li><b>Память браузера (localStorage).</b> Страница бронирования сохраняет имя и телефон на вашем устройстве, только если вы отметили «Запомнить на этом устройстве», — чтобы не вводить их заново. На сервер это не отправляется. Удалить можно, сняв галочку при следующей брони или очистив данные сайта в настройках браузера.</li>
 </ul></section><section class="sec" id="s2" aria-labelledby="h2"><h2 id="h2"><i aria-hidden="true">02</i>Карта Яндекса</h2>
-<p>В разделе «Как нас найти» карта загружается только после нажатия «Показать карту». С этого момента ваш браузер напрямую обращается к серверам ООО «ЯНДЕКС», и Яндекс может установить свои cookie по своим правилам. Если не хотите — не нажимайте кнопку и откройте адрес в приложении «Яндекс Карты» по ссылке.</p></section><section class="sec" id="s3" aria-labelledby="h3"><h2 id="h3"><i aria-hidden="true">03</i>Нужно ли согласие на cookie</h2>
-<p>Пока сайт не ставит cookie и не собирает аналитику, отдельное согласие не требуется. Если мы подключим аналитику или рекламу, то сначала обновим эту страницу и добавим запрос согласия.</p>
+<p>В разделе «Как нас найти» показана карта Яндекса. Когда вы прокручиваете страницу до неё, ваш браузер загружает карту с серверов ООО «ЯНДЕКС», и Яндекс может установить свои cookie по <a href="https://yandex.ru/legal/cookies_policy/" target="_blank" rel="noopener">своим правилам</a>. Мы при этом ваши данные Яндексу не передаём. Если вы не хотите этого, запретите сторонние cookie в настройках браузера.</p></section><section class="sec" id="s3" aria-labelledby="h3"><h2 id="h3"><i aria-hidden="true">03</i>Согласие и как его отозвать</h2>
+<p>Аналитические cookie ставятся только с вашего согласия. При первом визите на главной или на странице бронирования мы спрашиваем: «Принять» — включить Яндекс Метрику, «Только необходимые» — обойтись без неё. Сайт и бронирование работают одинаково при любом выборе.</p>
+<p>Передумали — нажмите кнопку ниже. Метрика перестанет загружаться, а при следующем визите мы снова спросим.</p>
+<p><button type="button" class="btn" id="ccReset">Отозвать согласие на аналитику</button> <span class="muted" id="ccState" role="status"></span></p>
 <p>Порядок обработки персональных данных описан в <a href="../privacy/">политике</a>.</p>
-<p class="muted">Редакция от 2 октября 2026 г.</p></section></div>
+<p class="muted">Редакция от 7 октября 2026 г.</p></section></div>
   </div>
 </main>
 <footer>
   <span>© 2026 Игровой клуб Game Play · г. Электросталь, проспект Ленина, 40/8</span>
   <nav aria-label="Документы"><a href="../privacy/">Конфиденциальность</a><a href="../consent/">Согласие</a><a href="../terms/">Условия</a><a href="../refund/">Возврат</a><a href="../cookies/" aria-current="page">Cookie</a><a href="../">Основной сайт</a></nav>
 </footer>
+<script>
+(function(){
+  var b = document.getElementById('ccReset'), st = document.getElementById('ccState'), v = null;
+  if (!b) return;
+  try { v = localStorage.getItem('gp_cookie_v1'); } catch (e) {}
+  st.textContent = v === 'yes' ? 'Сейчас: аналитика разрешена.' : v === 'no' ? 'Сейчас: только необходимые.' : 'Вы ещё не делали выбор.';
+  b.addEventListener('click', function(){
+    try { localStorage.removeItem('gp_cookie_v1'); localStorage.removeItem('gp_cookie_v1_at'); } catch (e) {}
+    /* удаляем cookie Метрики, установленные для нашего домена */
+    document.cookie.split(';').forEach(function(c){
+      var n = c.split('=')[0].trim();
+      if (/^_ym/.test(n)) ['', '; domain=' + location.hostname, '; domain=.' + location.hostname.replace(/^www\./, '')].forEach(function(d){
+        document.cookie = n + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + d;
+      });
+    });
+    st.textContent = 'Согласие отозвано. Метрика больше не загружается.';
+  });
+})();
+</script>
 </body>
 </html>
