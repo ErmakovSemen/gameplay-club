@@ -32,8 +32,19 @@ const SITE_TARIFFS = [
     'night' => ['title' => 'Ночь',     'sub' => '20:00 – 8:00'],
 ];
 
-/** Сколько активных будущих броней может держать один телефон. */
+/** Сколько активных будущих броней может держать один телефон.
+ *  Бронь на компанию (несколько мест на одно время) считается одной бронью. */
 const SITE_MAX_ACTIVE = 3;
+
+/** Максимум мест в одной брони на компанию (и не больше вместимости зоны). */
+const SITE_MAX_SEATS = 10;
+
+function seats_word(int $n): string {
+    $m10 = $n % 10; $m100 = $n % 100;
+    if ($m10 === 1 && $m100 !== 11) return 'место';
+    if ($m10 >= 2 && $m10 <= 4 && ($m100 < 12 || $m100 > 14)) return 'места';
+    return 'мест';
+}
 
 function is_site_user(int $uid): bool {
     return $uid < 0;
@@ -125,6 +136,7 @@ function site_config(): array {
         $tariffs[] = ['key' => $key, 'title' => $t['title'], 'sub' => $t['sub'], 'hours' => TARIFFS[$key][1]];
     }
     return [
+        'max_seats'  => SITE_MAX_SEATS,
         'zones'      => $zones,
         'tariffs'    => $tariffs,
         'days'       => site_days(),
@@ -182,6 +194,7 @@ function site_book(array $in): array {
     $hour   = $in['hour'] ?? null;
     $name   = site_clean_name((string)($in['name'] ?? ''));
     $digits = site_phone_digits((string)($in['phone'] ?? ''));
+    $seatsIn = $in['seats'] ?? 1;
 
     if (!isset(ZONES[$zone]))        return ['ok' => false, 'error' => 'Выберите зону'];
     if (!isset(TARIFFS[$tariff]))    return ['ok' => false, 'error' => 'Выберите тариф'];
@@ -193,6 +206,11 @@ function site_book(array $in): array {
     if (($in['consent'] ?? null) !== true)
                                      return ['ok' => false, 'error' => 'Отметьте согласие на обработку персональных данных', 'code' => 'consent'];
     $hour = (int)$hour;
+    if (!is_numeric($seatsIn) || (int)$seatsIn != $seatsIn || (int)$seatsIn < 1)
+                                     return ['ok' => false, 'error' => 'Укажите, сколько нужно мест'];
+    $seats = (int)$seatsIn;
+    $maxSeats = min(SITE_MAX_SEATS, ZONES[$zone]['cap']);
+    if ($seats > $maxSeats)          return ['ok' => false, 'error' => 'В этой зоне можно забронировать не больше ' . $maxSeats . ' ' . seats_word($maxSeats)];
     if ($tariff === 'night' && $hour !== NIGHT_HOUR)
                                      return ['ok' => false, 'error' => 'Ночной тариф начинается в ' . NIGHT_HOUR . ':00'];
 
@@ -205,22 +223,31 @@ function site_book(array $in): array {
     try {
         $uid = site_user_for($digits, $name);
 
-        // лимит на телефон: активные брони, которые ещё не закончились
-        $active = 0;
+        // лимит на телефон: активные брони, которые ещё не закончились;
+        // несколько мест на одну зону и одно время (бронь на компанию) — это одна бронь
+        $groups = [];
         foreach (active_bookings() as $r) {
             if ((int)$r['user_id'] !== $uid) continue;
             $end = (new DateTime($r['start']))->modify('+' . $r['hours'] . ' hour');
-            if ($end > new DateTime()) $active++;
+            if ($end > new DateTime()) $groups[$r['zone'] . '|' . $r['start']] = true;
         }
+        $active = count($groups);
         if ($active >= SITE_MAX_ACTIVE) {
             db()->exec('ROLLBACK');
             return ['ok' => false, 'error' => 'На этот номер уже есть ' . SITE_MAX_ACTIVE . ' активные брони. Позвоните нам: ' . CLUB_PHONE];
         }
-        if (free_seats($zone, $start, $hours) <= 0) {
+        $free = free_seats($zone, $start, $hours);
+        if ($free <= 0) {
             db()->exec('ROLLBACK');
             return ['ok' => false, 'error' => 'Место только что заняли. Выберите другое время', 'code' => 'full'];
         }
-        $bid = add_booking($uid, $zone, $start->format('c'), $hours, $tariff, $price);
+        if ($free < $seats) {
+            db()->exec('ROLLBACK');
+            return ['ok' => false, 'error' => "На это время свободно только $free " . seats_word($free) . '. Уменьшите число мест или выберите другое время', 'code' => 'few', 'free' => $free];
+        }
+        $ids = [];
+        for ($i = 0; $i < $seats; $i++) $ids[] = add_booking($uid, $zone, $start->format('c'), $hours, $tariff, $price);
+        $bid = $ids[0];
         record_consent($uid, 'site');
         db()->exec('COMMIT');
     } catch (Throwable $e) {
@@ -230,12 +257,15 @@ function site_book(array $in): array {
 
     $end = (clone $start)->modify("+$hours hour");
     $pretty = site_phone_pretty($digits);
+    $total = $price * $seats;
+    $idsTxt = $seats > 1 ? '#' . implode(', #', $ids) : "#$bid";
     foreach (ADMIN_IDS as $aid) {
-        send($aid, "🆕 <b>Новая бронь #$bid</b> · 🌐 с сайта\n" . DIV . "\n"
+        send($aid, ($seats > 1 ? "🆕 <b>Бронь на компанию: $seats " . seats_word($seats) . "</b> · 🌐 с сайта\n" : "🆕 <b>Новая бронь #$bid</b> · 🌐 с сайта\n") . DIV . "\n"
             . '👤 ' . esc($name) . " · $pretty\n"
-            . '🕹 ' . ZONES[$zone]['name'] . "\n"
+            . '🕹 ' . ZONES[$zone]['name'] . ($seats > 1 ? " · 👥 $seats " . seats_word($seats) : '') . "\n"
             . '🎟 ' . TARIFFS[$tariff][0] . "\n"
-            . '📅 ' . fmt_dt($start) . "\n💰 $price ₽");
+            . '📅 ' . fmt_dt($start) . "\n"
+            . ($seats > 1 ? "💰 $seats × $price ₽ = $total ₽\n🔖 $idsTxt" : "💰 $price ₽"));
     }
 
     return [
@@ -248,6 +278,9 @@ function site_book(array $in): array {
         'when'   => fmt_dt($start),
         'until'  => $end->format('H:00'),
         'price'  => $price,
+        'seats'  => $seats,
+        'ids'    => $ids,
+        'total'  => $total,
         'name'   => $name,
         'phone'  => $pretty,
     ];

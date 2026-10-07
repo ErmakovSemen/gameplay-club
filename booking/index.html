@@ -333,6 +333,43 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
 @media (prefers-reduced-motion:reduce){#cc{transition:none}}
 @media (max-width:980px){#cc{bottom:calc(84px + env(safe-area-inset-bottom,0px));left:12px}}
 
+/* seats stepper */
+.seats{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;margin-bottom:16px;background:rgba(139,92,246,.08);border-left:2px solid var(--storm);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)}
+.seats[hidden]{display:none}
+.seats-l{display:flex;flex-direction:column;gap:3px;min-width:0}
+.seats-l b{font-family:var(--disp);font-weight:800;font-size:15px;color:#fff;text-transform:uppercase;letter-spacing:.04em}
+.seats-l span{font-size:12.5px;color:var(--dim);line-height:1.4}
+.stepper{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.stepper button{width:44px;height:44px;display:grid;place-items:center;font:700 22px var(--mono);color:#fff;background:rgba(139,92,246,.22);
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);transition:background .25s,opacity .25s}
+.stepper button:hover{background:linear-gradient(140deg,#7c3aed,#c026d3)}
+.stepper button:disabled{opacity:.3;pointer-events:none}
+.stepper output{min-width:44px;text-align:center;font-family:var(--disp);font-weight:900;font-size:24px;color:#fff}
+.hr.few small{color:#fbbf24}
+.sum-calc{display:block;font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--plasma);margin-top:2px}
+.sum-calc:empty{display:none}
+@media (max-width:520px){.seats{flex-direction:column;align-items:stretch}.stepper{justify-content:space-between}.stepper output{flex:1}}
+
+/* Telegram bot as an alternative */
+.t-bot{color:#fff!important}
+.t-bot.ch{background:linear-gradient(160deg,rgba(139,92,246,.7),rgba(232,121,249,.5))}
+.t-bot svg{stroke:#fff}
+.botcard{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:18px;padding:20px 22px;--ch:16px}
+.bc-ico{width:48px;height:48px;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,#229ed9,#7c3aed);
+  clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
+.bc-ico svg{width:22px;height:22px}
+.bc-t{display:flex;flex-direction:column;gap:4px}
+.bc-t b{font-family:var(--disp);font-weight:800;font-size:17px;color:#fff;text-transform:uppercase;letter-spacing:.02em}
+.bc-t p{font-size:13.5px;color:#c9c3de;line-height:1.5}
+.bc-nick{font-family:var(--mono);color:var(--plasma)}
+.bc-btn{width:auto;padding:13px 18px;font-size:12.5px;white-space:nowrap}
+@media (max-width:640px){.botcard{grid-template-columns:auto minmax(0,1fr)}.bc-btn{grid-column:1 / -1}}
+.done-bot{display:flex;align-items:center;gap:12px;padding:12px 14px;font-size:13px;color:#c9c3de;background:rgba(34,158,217,.08);border-left:2px solid #229ed9;transition:background .3s}
+.done-bot:hover{background:rgba(34,158,217,.16)}
+.done-bot svg{width:20px;height:20px;flex-shrink:0;stroke:#5ec3f0}
+.done-bot b{color:#fff}
+
 /* reveal */
 .rv{opacity:0;transform:translateY(22px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
 .rv.on{opacity:1;transform:none}
@@ -358,6 +395,7 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
     <h1 class="rv d1">Забронируй <em>место</em></h1>
     <p class="lead rv d2">Выбери зону, тариф и время, оставь имя и номер — <b>всего 4 шага</b>. Оплата в клубе, предоплата не нужна.</p>
     <div class="trust rv d3">
+      <a class="t ch t-bot" href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"/></svg>Или в Telegram-боте</a>
       <span class="t ch"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Без предоплаты</span>
       <span class="t ch"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.4"/></svg>Электросталь, проспект Ленина, 40/8</span>
       <span class="t ch"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Круглосуточно</span>
@@ -392,9 +430,17 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
           <div class="step-r"><span class="step-pick" id="p3"></span><button type="button" class="step-edit" data-edit="3" aria-label="Изменить время">Изменить</button></div>
         </div>
         <div class="step-body">
+          <div class="seats" id="seatsBox" hidden>
+            <div class="seats-l"><b>Сколько мест?</b><span>Идёте компанией — забронируйте места для всех за один раз</span></div>
+            <div class="stepper" role="group" aria-label="Количество мест">
+              <button type="button" id="seatMinus" aria-label="Меньше мест">−</button>
+              <output id="seatN" aria-live="polite">1</output>
+              <button type="button" id="seatPlus" aria-label="Больше мест">+</button>
+            </div>
+          </div>
           <div class="days" id="days"></div>
           <div class="hours" id="hours"></div>
-          <div class="hours-note" id="hoursNote"><i></i>под временем — цена за весь тариф и сколько мест свободно</div>
+          <div class="hours-note" id="hoursNote"><i></i><span id="hoursNoteT">под временем — цена за весь тариф и сколько мест свободно</span></div>
         </div>
       </section>
 
@@ -417,6 +463,16 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
           <div class="msg" id="msg" role="alert" aria-live="assertive"></div>
         </div>
       </section>
+
+      <aside class="botcard ch rv" aria-label="Бронирование в Telegram">
+        <span class="bc-ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"/></svg></span>
+        <div class="bc-t">
+          <span class="step-k">Другой способ</span>
+          <b>Удобнее в Telegram?</b>
+          <p>Бронируйте в нашем боте <span class="bc-nick">@GamePlayCC_bot</span>: там видны все ваши брони, отмена в одно касание, а за час до игры бот напомнит о брони.</p>
+        </div>
+        <a class="btn btn-ghost bc-btn" href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener"><span></span>Открыть бота</a>
+      </aside>
     </div>
 
     <aside class="sum ch rv d3" id="sum">
@@ -425,10 +481,11 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
       <div class="sum-rows">
         <div class="sr"><span>Зона</span><b class="muted" id="rZone">—</b></div>
         <div class="sr"><span>Тариф</span><b class="muted" id="rTariff">—</b></div>
+        <div class="sr" id="rSeatsRow" hidden><span>Мест</span><b id="rSeats">1</b></div>
         <div class="sr"><span>Начало</span><b class="muted" id="rWhen">—</b></div>
         <div class="sr"><span>До</span><b class="muted" id="rUntil">—</b></div>
       </div>
-      <div class="sum-price"><span>Итого</span><div style="text-align:right"><b id="rPrice"></b><em class="sum-wait" id="rWait">появится после выбора времени</em><small>оплата в клубе</small></div></div>
+      <div class="sum-price"><span>Итого</span><div style="text-align:right"><b id="rPrice"></b><em class="sum-calc" id="rCalc"></em><em class="sum-wait" id="rWait">появится после выбора времени</em><small>оплата в клубе</small></div></div>
       <button class="btn" id="submit" disabled>Подтвердить бронь</button>
       <p class="fine">Бронь бесплатна, оплата в клубе. <a href="../terms/" style="color:var(--plasma)">Условия бронирования</a> · <a href="../refund/" style="color:var(--plasma)">отмена и возврат</a>.</p>
       <div class="alt"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"/></svg>или в <a href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener">Telegram-боте</a></div>
@@ -448,10 +505,12 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
     <div class="done-rows">
       <div class="sr"><span>Зона</span><b id="dZone"></b></div>
       <div class="sr"><span>Тариф</span><b id="dTariff"></b></div>
+      <div class="sr" id="dSeatsRow" hidden><span>Мест</span><b id="dSeats"></b></div>
       <div class="sr"><span>Когда</span><b id="dWhen"></b></div>
       <div class="sr"><span>Итого</span><b id="dPrice"></b></div>
     </div>
     <div class="done-note">💜&nbsp; Ждём вас в клубе: назовите администратору имя или номер телефона. Оплата на месте.</div>
+    <a class="done-bot" href="https://t.me/GamePlayCC_bot" target="_blank" rel="noopener"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L2 10.5l6 2.3M21 3L15 21l-7-8.2M21 3L8.8 12.8"/></svg><span>В следующий раз бронируйте в <b>Telegram-боте</b> — он напомнит за час до игры</span></a>
     <div class="done-acts">
       <a class="btn" href="https://yandex.ru/maps/org/game_play/37915683937/" target="_blank" rel="noopener">Как добраться</a>
       <a class="btn btn-ghost" href="tel:+79060354632"><span></span>Позвонить</a>
@@ -475,13 +534,13 @@ footer .fl{display:flex;flex-wrap:wrap;gap:14px 22px}
   </div>
 </footer>
 
-<script type="application/json" id="gp-cfg">{"zones":[{"key":"bootcamp","title":"Bootcamp","tag":"VIP","sub":"RTX 5060 · 32 ГБ · 300 Гц, изогнутые","cap":5,"from":170,"prices":{"day":{"wd":[170,450,680],"we":[190,520,780]},"eve":{"wd":[190,520,780],"we":[220,590,900]},"night":{"wd":800,"we":920}}},{"key":"normal","title":"Normal","tag":"","sub":"RTX 3060 · 16 ГБ · 180 Гц","cap":10,"from":120,"prices":{"day":{"wd":[120,320,480],"we":[140,360,560]},"eve":{"wd":[140,360,560],"we":[160,420,640]},"night":{"wd":580,"we":660}}},{"key":"ps_vip","title":"PS5 Pro · VIP","tag":"VIP","sub":"PlayStation 5 Pro · 65″ 120 Гц · VIP зона","cap":1,"from":320,"prices":{"day":{"wd":[320,820,1200],"we":[370,900,1350]},"eve":{"wd":[350,900,1350],"we":[400,1000,1450]},"night":{"wd":1500,"we":1750}}},{"key":"ps","title":"PS5 · GamePlay","tag":"","sub":"PlayStation 5 · 55″ 120 Гц · обычная зона","cap":1,"from":270,"prices":{"day":{"wd":[270,620,950],"we":[320,700,1100]},"eve":{"wd":[300,700,1100],"we":[350,800,1250]},"night":{"wd":1300,"we":1500}}}],"tariffs":[{"key":"kiber","title":"Киберчас","sub":"1 час","hours":1},{"key":"tripl","title":"Трипл","sub":"3 часа","hours":3},{"key":"ultra","title":"Ультра","sub":"5 часов","hours":5},{"key":"night","title":"Ночь","sub":"20:00 – 8:00","hours":12}],"day_start":8,"eve_start":16,"night_hour":20,"phone":"+7 906 035 46 32","address":"г. Электросталь, проспект Ленина, 40\/8","channel":"https:\/\/t.me\/gameplaypcclub","days_ahead":7}</script>
+<script type="application/json" id="gp-cfg">{"zones":[{"key":"bootcamp","title":"Bootcamp","tag":"VIP","sub":"RTX 5060 · 32 ГБ · 300 Гц, изогнутые","cap":5,"from":170,"prices":{"day":{"wd":[170,450,680],"we":[190,520,780]},"eve":{"wd":[190,520,780],"we":[220,590,900]},"night":{"wd":800,"we":920}}},{"key":"normal","title":"Normal","tag":"","sub":"RTX 3060 · 16 ГБ · 180 Гц","cap":10,"from":120,"prices":{"day":{"wd":[120,320,480],"we":[140,360,560]},"eve":{"wd":[140,360,560],"we":[160,420,640]},"night":{"wd":580,"we":660}}},{"key":"ps_vip","title":"PS5 Pro · VIP","tag":"VIP","sub":"PlayStation 5 Pro · 65″ 120 Гц · VIP зона","cap":1,"from":320,"prices":{"day":{"wd":[320,820,1200],"we":[370,900,1350]},"eve":{"wd":[350,900,1350],"we":[400,1000,1450]},"night":{"wd":1500,"we":1750}}},{"key":"ps","title":"PS5 · GamePlay","tag":"","sub":"PlayStation 5 · 55″ 120 Гц · обычная зона","cap":1,"from":270,"prices":{"day":{"wd":[270,620,950],"we":[320,700,1100]},"eve":{"wd":[300,700,1100],"we":[350,800,1250]},"night":{"wd":1300,"we":1500}}}],"tariffs":[{"key":"kiber","title":"Киберчас","sub":"1 час","hours":1},{"key":"tripl","title":"Трипл","sub":"3 часа","hours":3},{"key":"ultra","title":"Ультра","sub":"5 часов","hours":5},{"key":"night","title":"Ночь","sub":"20:00 – 8:00","hours":12}],"day_start":8,"eve_start":16,"night_hour":20,"phone":"+7 906 035 46 32","address":"г. Электросталь, проспект Ленина, 40/8","channel":"https://t.me/gameplaypcclub","days_ahead":7,"max_seats":10}</script>
 <script>
 (function(){
 "use strict";
 var API = 'api.php';
 var cfg = null, mode = 'live';
-var sel = { zone:null, tariff:null, date:null, hour:null, price:null, slotsHours:null };
+var sel = { zone:null, tariff:null, date:null, hour:null, price:null, slotsHours:null, seats:1, lastSlots:null };
 var $ = function(id){ return document.getElementById(id); };
 
 /* ---------- stars ---------- */
@@ -581,19 +640,24 @@ function localSlots(){
 }
 function drawSlots(d){
   var h = $('hours');
-  sel.slotsHours = d.hours;
-  var free = d.slots.filter(function(s){ return s.free > 0; });
-  if (!d.slots.length || !free.length) { h.innerHTML = '<p class="empty">На эту дату свободных окон нет — выберите другой день.</p>'; return; }
+  sel.slotsHours = d.hours; sel.lastSlots = d;
+  var need = sel.seats || 1;
+  var free = d.slots.filter(function(s){ return s.free >= need; });
+  updateHoursNote();
+  if (!d.slots.length || !free.length) { h.innerHTML = '<p class="empty">' + (need > 1 && d.slots.some(function(s){ return s.free > 0; }) ? 'На эту дату нет времени, где свободно ' + need + ' ' + seatsWord(need) + ' сразу, — уменьшите число мест или выберите другой день.' : 'На эту дату свободных окон нет — выберите другой день.') + '</p>'; return; }
   function cell(s){
     if (sel.tariff === 'night') {
       var end = (s.hour + d.hours) % 24;
-      return '<button type="button" class="hr ch night" aria-pressed="false" aria-label="Ночь с ' + pad(s.hour) + ':00 до ' + pad(end) + ':00, ' + fmtPrice(s.price) + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00 → ' + pad(end) + ':00</b><span>' + fmtPrice(s.price) + '</span></button>';
+      var okN = s.free >= need;
+      return '<button type="button" class="hr ch night' + (okN ? '' : ' full') + '"' + (okN ? '' : ' disabled') + ' aria-pressed="false" aria-label="Ночь с ' + pad(s.hour) + ':00 до ' + pad(end) + ':00, ' + fmtPrice(s.price * need) + (okN ? '' : ', недостаточно мест') + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00 → ' + pad(end) + ':00</b><span>' + (okN ? fmtPrice(s.price * need) : 'свободно ' + s.free) + '</span></button>';
     }
-    var lbl = pad(s.hour) + ':00, ' + fmtPrice(s.price) + (s.free > 0 ? (zoneOf(sel.zone).cap > 1 ? ', свободно мест: ' + s.free : ', свободно') : ', занято');
-    return '<button type="button" class="hr ch' + (s.free > 0 ? '' : ' full') + '"' + (s.free > 0 ? '' : ' disabled') + ' aria-pressed="false" aria-label="' + lbl + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00</b><span>' + fmtPrice(s.price) + '</span>'
-      + (s.free > 0 ? '<small>' + (zoneOf(sel.zone).cap > 1 ? '<em>свободно </em>' + s.free : 'свободно') + '</small>' : '<small>занято</small>') + '</button>';
+    var ok = s.free >= need, few = s.free > 0 && !ok;
+    var lbl = pad(s.hour) + ':00, ' + fmtPrice(s.price * need) + (ok ? (zoneOf(sel.zone).cap > 1 ? ', свободно мест: ' + s.free : ', свободно') : few ? ', свободно только ' + s.free : ', занято');
+    return '<button type="button" class="hr ch' + (ok ? '' : few ? ' full few' : ' full') + '"' + (ok ? '' : ' disabled') + ' aria-pressed="false" aria-label="' + lbl + '" data-hour="' + s.hour + '" data-price="' + s.price + '"><b>' + pad(s.hour) + ':00</b><span>' + fmtPrice(s.price * need) + '</span>'
+      + (ok ? '<small>' + (zoneOf(sel.zone).cap > 1 ? '<em>свободно </em>' + s.free : 'свободно') + '</small>' : few ? '<small>только ' + s.free + '</small>' : '<small>занято</small>') + '</button>';
   }
   if (sel.tariff === 'night') { h.innerHTML = '<div class="hours-g">' + d.slots.map(cell).join('') + '</div>'; if (free.length === 1) pickHour(free[0].hour, free[0].price, false); return; }
+  if (sel.hour !== null) markHour();
   var groups = [
     { t:'Ночь',  s:'00:00–07:59 · вечерние цены', test:function(x){ return x < cfg.day_start; } },
     { t:'День',  s:pad(cfg.day_start) + ':00–' + pad(cfg.eve_start - 1) + ':59 · дневные цены', test:function(x){ return x >= cfg.day_start && x < cfg.eve_start; } },
@@ -621,6 +685,39 @@ function loadSlots(){
 }
 
 /* ---------- summary ---------- */
+function maxSeats(){ var z = sel.zone ? zoneOf(sel.zone) : null; return z ? Math.min(cfg.max_seats || 10, z.cap) : 1; }
+function updateHoursNote(){
+  var n = sel.seats || 1;
+  $('hoursNoteT').textContent = n > 1 ? 'под временем — цена за ' + n + ' ' + seatsWord(n) + ' на весь тариф и сколько мест свободно' : 'под временем — цена за весь тариф и сколько мест свободно';
+}
+function markHour(){
+  document.querySelectorAll('[data-hour]').forEach(function(b){ var on = +b.dataset.hour === sel.hour; b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+}
+function renderSeats(){
+  var mx = maxSeats(), box = $('seatsBox');
+  box.hidden = mx <= 1;
+  if (sel.seats > mx) sel.seats = mx;
+  $('seatN').textContent = sel.seats;
+  $('seatMinus').disabled = sel.seats <= 1; $('seatPlus').disabled = sel.seats >= mx;
+}
+function setSeats(n){
+  var mx = maxSeats(); n = Math.max(1, Math.min(mx, n));
+  if (n === sel.seats) return;
+  sel.seats = n; renderSeats();
+  if (sel.hour !== null && sel.lastSlots) {
+    var cur = sel.lastSlots.slots.filter(function(s){ return s.hour === sel.hour; })[0];
+    if (!cur || cur.free < n) { sel.hour = null; sel.price = null; $('p3').textContent = ''; setStep(3, null); setStep(4, 'locked'); }
+  }
+  if (sel.lastSlots && sel.lastSlots.zone === sel.zone && sel.lastSlots.tariff === sel.tariff && sel.lastSlots.date === sel.date) drawSlots(sel.lastSlots);
+  else updateHoursNote();
+  if (sel.hour !== null) { var d = dayOf(sel.date); $('p3').textContent = d.label + ', ' + d.wday + ' · ' + pad(sel.hour) + ':00' + (n > 1 ? ' · ' + n + ' ' + seatsWord(n) : ''); }
+  updateSummary();
+}
+document.addEventListener('click', function(e){
+  if (e.target.closest('#seatMinus')) setSeats(sel.seats - 1);
+  else if (e.target.closest('#seatPlus')) setSeats(sel.seats + 1);
+});
+
 function updateSummary(){
   var z = sel.zone ? zoneOf(sel.zone) : null, t = sel.tariff ? tariffOf(sel.tariff) : null, d = sel.date ? dayOf(sel.date) : null;
   function set(id, val){ var el = $(id); el.textContent = val || '—'; el.classList.toggle('muted', !val); }
@@ -630,26 +727,29 @@ function updateSummary(){
   set('rWhen', when);
   var until = (sel.hour !== null && sel.slotsHours) ? pad((sel.hour + sel.slotsHours) % 24) + ':00' + (sel.hour + sel.slotsHours >= 24 ? ' (след. день)' : '') : null;
   set('rUntil', until);
-  $('rPrice').textContent = sel.price !== null ? fmtPrice(sel.price) : '';
+  var n = sel.seats || 1, total = sel.price !== null ? sel.price * n : null;
+  $('rSeatsRow').hidden = n <= 1; $('rSeats').textContent = n + ' ' + seatsWord(n);
+  $('rPrice').textContent = total !== null ? fmtPrice(total) : '';
+  $('rCalc').textContent = total !== null && n > 1 ? n + ' × ' + fmtPrice(sel.price) : '';
   $('rWait').style.display = sel.price !== null ? 'none' : '';
   var ready = sel.zone && sel.tariff && sel.date && sel.hour !== null;
   var stepN = !sel.zone ? 1 : !sel.tariff ? 2 : (sel.hour === null ? 3 : 4);
   $('sumStep').textContent = 'шаг ' + stepN + ' / 4';
   Array.prototype.forEach.call($('prog').children, function(el, i){ el.className = i < stepN - 1 || (ready && i === 3 && $('fName').value.trim().length > 1 && $('fPhone').value.replace(/\D/g,'').length >= 11) ? 'on' : (i === stepN - 1 ? 'cur' : ''); });
   $('submit').disabled = !ready; $('submitM').disabled = !ready;
-  $('bpP').textContent = sel.price !== null ? fmtPrice(sel.price) : 'Шаг ' + stepN + ' из 4';
+  $('bpP').textContent = total !== null ? fmtPrice(total) : 'Шаг ' + stepN + ' из 4';
   $('bpP').classList.toggle('st', sel.price === null);
-  $('bpL').textContent = !sel.zone ? 'Выберите зону' : !sel.tariff ? z.title + ' · выберите тариф' : !sel.date ? z.title + ' · ' + t.title + ' · выберите день' : sel.hour === null ? 'Выберите время' : (z.title + ' · ' + when);
+  $('bpL').textContent = !sel.zone ? 'Выберите зону' : !sel.tariff ? z.title + ' · выберите тариф' : !sel.date ? z.title + ' · ' + t.title + ' · выберите день' : sel.hour === null ? 'Выберите время' : (z.title + (n > 1 ? ' · ' + n + ' ' + seatsWord(n) : '') + ' · ' + when);
 }
 
 /* ---------- picks ---------- */
 function pickZone(k, auto){
-  sel.zone = k; sel.tariff = null; sel.date = null; sel.hour = null; sel.price = null;
+  sel.zone = k; sel.tariff = null; sel.date = null; sel.hour = null; sel.price = null; sel.seats = 1; sel.lastSlots = null;
   document.querySelectorAll('[data-zone]').forEach(function(b){ b.classList.toggle('sel', b.dataset.zone === k);  b.setAttribute('aria-pressed', b.classList.contains('sel') ? 'true' : 'false'); });
   $('p1').textContent = zoneOf(k).title;
   setStep(1, 'done'); setStep(2, null); setStep(3, 'locked'); setStep(4, 'locked');
   $('p2').textContent = ''; $('p3').textContent = '';
-  renderTariffs(); updateSummary();
+  renderTariffs(); renderSeats(); updateSummary();
   if (!auto) { scrollTo($('s2')); focusStep(2); }
 }
 function pickTariff(k){
@@ -669,7 +769,7 @@ function pickDate(d){
 function pickHour(h, price, scroll){
   sel.hour = h; sel.price = price;
   document.querySelectorAll('[data-hour]').forEach(function(b){ b.classList.toggle('sel', +b.dataset.hour === h);  b.setAttribute('aria-pressed', b.classList.contains('sel') ? 'true' : 'false'); });
-  var d = dayOf(sel.date); $('p3').textContent = d.label + ', ' + d.wday + ' · ' + pad(h) + ':00';
+  var d = dayOf(sel.date); $('p3').textContent = d.label + ', ' + d.wday + ' · ' + pad(h) + ':00' + (sel.seats > 1 ? ' · ' + sel.seats + ' ' + seatsWord(sel.seats) : '');
   setStep(3, 'done'); setStep(4, null);
   updateSummary(); if (scroll !== false) scrollTo($('s4'));
   setTimeout(function(){ $(!$('fName').value ? 'fName' : (!$('fPhone').value ? 'fPhone' : 'fConsent')).focus({ preventScroll:true }); }, 450);
@@ -716,21 +816,23 @@ function submit(){
   showMsg('');
   var btns = [$('submit'), $('submitM')]; btns.forEach(function(b){ b.classList.add('busy'); });
   fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({
-    action:'book', zone:sel.zone, tariff:sel.tariff, date:sel.date, hour:sel.hour, name:name, phone:phone, consent: $('fConsent').checked === true,
+    action:'book', zone:sel.zone, tariff:sel.tariff, date:sel.date, hour:sel.hour, seats:sel.seats, name:name, phone:phone, consent: $('fConsent').checked === true,
     website: document.querySelector('[name=website]').value }) })
     .then(function(r){ return r.json(); })
     .then(function(d){
       btns.forEach(function(b){ b.classList.remove('busy'); });
       if (!d.ok) { showMsg(d.error || 'Не получилось. Попробуйте ещё раз.'); if (d.code === 'consent') { $('consentWrap').classList.add('err'); $('fConsent').focus(); }
-      if (d.code === 'full') { sel.hour = null; sel.price = null; updateSummary(); loadSlots(); setStep(3, null); setStep(4, 'locked'); scrollTo($('s3')); } return; }
-      $('dId').textContent = '#' + d.id; $('dZone').textContent = d.zone; $('dTariff').textContent = d.tariff;
-      $('dWhen').textContent = d.when + ' → ' + d.until; $('dPrice').textContent = fmtPrice(d.price);
+      if (d.code === 'full' || d.code === 'few') { sel.hour = null; sel.price = null; updateSummary(); loadSlots(); setStep(3, null); setStep(4, 'locked'); scrollTo($('s3')); } return; }
+      var ids = d.ids || [d.id], ns = d.seats || 1;
+      $('dId').textContent = ids.length > 1 ? '#' + ids[0] + '–' + ids[ids.length - 1] : '#' + d.id; $('dZone').textContent = d.zone; $('dTariff').textContent = d.tariff;
+      $('dSeatsRow').hidden = ns <= 1; $('dSeats').textContent = ns + ' ' + seatsWord(ns);
+      $('dWhen').textContent = d.when + ' → ' + d.until; $('dPrice').textContent = ns > 1 ? fmtPrice(d.total) + ' (' + ns + ' × ' + fmtPrice(d.price) + ')' : fmtPrice(d.price);
       openDone();
       // Only a confirmed booking is a conversion; booking price is not paid revenue.
       try {
         if (Number(d.id) > 0 && typeof window.ym === 'function') {
           window.ym(113524983, 'reachGoal', 'booking_success', {
-            booking_id: String(d.id), zone: sel.zone, tariff: sel.tariff
+            booking_id: String(d.id), zone: sel.zone, tariff: sel.tariff, seats: d.seats || 1
           });
         }
       } catch (analyticsError) { /* Analytics must not interrupt booking confirmation. */ }

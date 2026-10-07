@@ -725,6 +725,12 @@ ok('политика ПД называет ООО «ЯНДЕКС» получа�
 ok('нет боковых точек-навигации', !str_contains($main, 'id="dots"'));
 ok('лента не останавливается при наведении', !str_contains($main, 'animation-play-state:paused'));
 ok('у некликабельных элементов нет эффектов наведения', !preg_match('#\.(?:card|chip|tbl-card|stat|specs li|tariff-note \.tn)(?:[^{,]*)?:hover|\.perks \.feat:hover#', $main));
+preg_match_all('#<a\b[^>]*href="([^"]*)"[^>]*>(?:(?!</a>).)*?Заброниров(?:(?!</a>).)*</a>#su', $main, $bk);
+ok('на главной все кнопки «Забронировать» ведут на /booking/ (' . count($bk[1]) . ' шт.)', count($bk[1]) >= 6 && !array_filter($bk[1], fn($u) => !str_starts_with($u, '/booking/')));
+$bh = file_get_contents("$root/booking/index.html");
+ok('на /booking/ предлагается Telegram-бот как другой способ', substr_count($bh, 'https://t.me/GamePlayCC_bot') >= 3 && str_contains($bh, 'Удобнее в Telegram?'));
+ok('на /booking/ есть выбор количества мест', str_contains($bh, 'id="seatPlus"') && str_contains($bh, 'seats:sel.seats'));
+if (preg_match('#<script type="application/json" id="gp-cfg">(.*?)</script>#s', $bh, $mm2)) is_eq('встроенный справочник знает максимум мест', json_decode($mm2[1], true)['max_seats'] ?? 0, SITE_MAX_SEATS);
 ok('плавающая кнопка брони ведёт на /booking/', (bool)preg_match('#<div id="fab">\s*<a class="fab-main" href="/booking/"#', $main));
 
 // реквизиты: пока есть незаполненные поля, выкладывать нельзя
@@ -735,6 +741,48 @@ foreach (array_merge(['index.html', 'booking/index.html'], array_map(fn($p) => "
 }
 ok('все реквизиты и условия заполнены (нет полей data-fill)', !$fills,
     $fills ? 'заполни: ' . implode(', ', array_map(fn($k, $v) => "$k (" . implode(', ', array_unique($v)) . ')', array_keys($fills), $fills)) : '');
+
+// ══════════════════════════════════════════════════════════
+group('19. Бронь на компанию: несколько мест за один раз');
+
+$d3 = (new DateTime('today +2 day'))->format('Y-m-d');
+$st3 = new DateTime("$d3 15:00");
+$free0 = free_seats('normal', $st3, 1);
+calls_reset();
+$g = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 15, 'seats' => 4,
+                'name' => 'Компания', 'phone' => '79991112233', 'consent' => true]);
+ok('бронь на 4 места проходит', $g['ok'] === true, json_encode($g, JSON_UNESCAPED_UNICODE));
+is_eq('создано 4 строки броней', count($g['ids'] ?? []), 4);
+is_eq('свободных мест стало меньше на 4', free_seats('normal', $st3, 1), $free0 - 4);
+is_eq('итог = цена × места', $g['total'] ?? 0, $g['price'] * 4);
+$own = db()->query("SELECT COUNT(DISTINCT user_id) FROM bookings WHERE id IN (" . implode(',', $g['ids']) . ")")->fetchColumn();
+is_eq('все места записаны на одного человека', (int)$own, 1);
+ok('админу одно сообщение «на компанию» со всеми номерами', count(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === 1001)) === 1
+    && str_contains(sent_text(), 'Бронь на компанию: 4 места') && str_contains(sent_text(), '#' . $g['ids'][3]));
+$sl3 = site_slots('normal', 'kiber', $d3);
+is_eq('бот и сайт видят занятые места', $sl3['slots'][15]['free'], $free0 - 4);
+
+$left = free_seats('normal', $st3, 1);
+$g2 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 15, 'seats' => $left + 1,
+                 'name' => 'Ещё компания', 'phone' => '79991112244', 'consent' => true]);
+ok('мест больше, чем свободно, — отказ с кодом few', $g2['ok'] === false && ($g2['code'] ?? '') === 'few' && ($g2['free'] ?? -1) === $left);
+is_eq('после отказа ничего не записано', free_seats('normal', $st3, 1), $left);
+ok('на PS (1 место) нельзя взять 2', site_book(['zone' => 'ps', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 18, 'seats' => 2,
+    'name' => 'Двое', 'phone' => '79991112255', 'consent' => true])['ok'] === false);
+ok('0 мест — отказ', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 9, 'seats' => 0,
+    'name' => 'Ноль', 'phone' => '79991112266', 'consent' => true])['ok'] === false);
+ok('дробное число мест — отказ', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 9, 'seats' => 1.5,
+    'name' => 'Полтора', 'phone' => '79991112277', 'consent' => true])['ok'] === false);
+ok('без seats бронируется одно место', ($one = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 9,
+    'name' => 'Один', 'phone' => '79991112288', 'consent' => true]))['ok'] === true && count($one['ids']) === 1);
+// бронь на компанию — одна бронь для лимита на телефон
+$ph = '79991112299'; $okAll = true;
+foreach ([10, 11, 12] as $hh) $okAll = $okAll && site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => $hh, 'seats' => 3,
+    'name' => 'Лимит', 'phone' => $ph, 'consent' => true])['ok'];
+ok('три брони на компанию по 3 места укладываются в лимит', $okAll);
+ok('четвёртая — уже сверх лимита', site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $d3, 'hour' => 13, 'seats' => 1,
+    'name' => 'Лимит', 'phone' => $ph, 'consent' => true])['ok'] === false);
+is_eq('справочник знает максимум мест', site_config()['max_seats'], SITE_MAX_SEATS);
 
 // ══════════════════════════════════════════════════════════
 // ИТОГ
