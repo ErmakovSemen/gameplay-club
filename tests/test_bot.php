@@ -785,6 +785,72 @@ ok('четвёртая — уже сверх лимита', site_book(['zone' =>
 is_eq('справочник знает максимум мест', site_config()['max_seats'], SITE_MAX_SEATS);
 
 // ══════════════════════════════════════════════════════════
+group('20. Рабочий чат: уведомления персоналу в группу');
+
+$WC = -1009876543210;
+$tm = (new DateTime('today +3 day'))->format('Y-m-d');
+$ofChat = fn(int $id) => array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $id));
+
+// /chatid в группе: админу — готовая строка, остальным — отказ; больше бот в группе ничего не делает
+$grp = fn(int $from, string $text, array $extra = []) => handle_update(['message' => array_merge([
+    'message_id' => 5, 'chat' => ['id' => $WC, 'type' => 'supergroup', 'title' => 'Game Play — работа'],
+    'from' => ['id' => $from, 'first_name' => 'Кто-то'], 'text' => $text], $extra)]);
+calls_reset(); $grp(1001, '/chatid');
+ok('/chatid от админа: бот присылает строку для config.php', str_contains(sent_text(), "const WORK_CHAT_ID = $WC;"));
+calls_reset(); $grp(1001, '/chatid@GamePlayCC_bot', ['message_thread_id' => 77, 'is_topic_message' => true]);
+ok('/chatid в теме: присылает и id темы, ответ в ту же тему', str_contains(sent_text(), 'const WORK_CHAT_THREAD = 77;') && ($ofChat($WC)[0][1]['message_thread_id'] ?? 0) === 77);
+calls_reset(); $grp(4242, '/chatid');
+ok('/chatid от не-админа — отказ без id', str_contains(sent_text(), 'для администраторов') && !str_contains(sent_text(), (string)$WC));
+calls_reset(); $grp(4242, 'Кто сегодня на смене?'); $grp(4242, '/start'); $grp(4242, '/book');
+is_eq('на обычные сообщения и команды в группе бот молчит', count($GLOBALS['gp_calls']), 0);
+ok('группа не записалась в базу как клиент', get_user($WC) === null || get_user($WC) === false || empty(get_user($WC)));
+calls_reset(); handle_update(['callback_query' => ['id' => 'g', 'from' => ['id' => 4242], 'data' => 'menu',
+    'message' => ['message_id' => 1, 'chat' => ['id' => $WC, 'type' => 'supergroup']]]]);
+is_eq('нажатия кнопок в группе игнорируются', count($ofChat($WC)) + count(calls_of('editMessageText')), 0);
+
+// пока WORK_CHAT_ID не задан — как раньше, админам в личку
+calls_reset();
+$b0 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm, 'hour' => 14, 'name' => 'Без чата', 'phone' => '79990002201', 'consent' => true]);
+ok('без рабочего чата бронь уходит админу лично', $b0['ok'] && count($ofChat(1001)) === 1);
+
+// задаём рабочий чат
+define('WORK_CHAT_ID', $WC);
+calls_reset();
+$b1 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm, 'hour' => 15, 'seats' => 3, 'name' => 'Компания', 'phone' => '79990002202', 'consent' => true]);
+ok('бронь с сайта приходит в рабочий чат', $b1['ok'] && count($ofChat($WC)) === 1 && str_contains($ofChat($WC)[0][1]['text'], 'Бронь на компанию: 3 места'));
+is_eq('и не дублируется админу в личку', count($ofChat(1001)), 0);
+ok('в рабочий чат уходит HTML-разметка', ($ofChat($WC)[0][1]['parse_mode'] ?? '') === 'HTML');
+
+// бронь из бота → тоже в рабочий чат
+$tgUser = 555001;
+db()->prepare('INSERT OR REPLACE INTO users (id, name, real_name, phone, created) VALUES (?,?,?,?,?)')->execute([$tgUser, 'Петя', 'Петя', '+79990002203', date('c')]);
+record_consent($tgUser, 'bot');
+set_user($tgUser, 'draft', json_encode(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm, 'hour' => 17]));
+calls_reset();
+handle_update(['callback_query' => ['id' => 'c', 'from' => ['id' => $tgUser, 'first_name' => 'Петя'], 'data' => 'confirm',
+    'message' => ['message_id' => 9, 'chat' => ['id' => $tgUser, 'type' => 'private']]]]);
+ok('бронь из бота приходит в рабочий чат с пометкой «из бота»', count($ofChat($WC)) === 1 && str_contains($ofChat($WC)[0][1]['text'], 'из бота'), sent_text());
+
+// отмена клиентом → в рабочий чат, с зоной и временем
+$bid = (int)db()->query("SELECT MAX(id) FROM bookings WHERE user_id=$tgUser")->fetchColumn();
+calls_reset();
+handle_update(['callback_query' => ['id' => 'x', 'from' => ['id' => $tgUser, 'first_name' => 'Петя'], 'data' => "cancel:$bid",
+    'message' => ['message_id' => 9, 'chat' => ['id' => $tgUser, 'type' => 'private']]]]);
+ok('отмена приходит в рабочий чат с зоной и временем', count($ofChat($WC)) === 1 && str_contains($ofChat($WC)[0][1]['text'], "Отмена брони #$bid") && str_contains($ofChat($WC)[0][1]['text'], ZONES['normal']['name']));
+
+// рабочий чат недоступен → бронь не теряется, уходит админам с пометкой
+$GLOBALS['gp_fail_chat'] = $WC; calls_reset();
+$b2 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm, 'hour' => 19, 'name' => 'Запасной', 'phone' => '79990002204', 'consent' => true]);
+ok('если чат недоступен, админ получает бронь лично с предупреждением', $b2['ok'] && count($ofChat(1001)) === 1
+    && str_contains($ofChat(1001)[0][1]['text'], 'Не удалось отправить в рабочий чат') && str_contains($ofChat(1001)[0][1]['text'], 'Запасной'));
+unset($GLOBALS['gp_fail_chat']);
+
+$ex = file_get_contents("$root/config.example.php");
+ok('config.example.php объясняет WORK_CHAT_ID', str_contains($ex, 'WORK_CHAT_ID') && str_contains($ex, '/chatid'));
+$code = file_get_contents("$root/webhook.php") . file_get_contents("$root/site_booking.php");
+ok('уведомления о бронях больше не шлются напрямую через ADMIN_IDS', !preg_match('#foreach \(ADMIN_IDS#', $code));
+
+// ══════════════════════════════════════════════════════════
 // ИТОГ
 echo "\n" . str_repeat('─', 50) . "\n";
 if ($GLOBALS['t_fail']) {

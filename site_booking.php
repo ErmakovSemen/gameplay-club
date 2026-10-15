@@ -259,14 +259,12 @@ function site_book(array $in): array {
     $pretty = site_phone_pretty($digits);
     $total = $price * $seats;
     $idsTxt = $seats > 1 ? '#' . implode(', #', $ids) : "#$bid";
-    foreach (ADMIN_IDS as $aid) {
-        send($aid, ($seats > 1 ? "🆕 <b>Бронь на компанию: $seats " . seats_word($seats) . "</b> · 🌐 с сайта\n" : "🆕 <b>Новая бронь #$bid</b> · 🌐 с сайта\n") . DIV . "\n"
+    notify_staff(($seats > 1 ? "🆕 <b>Бронь на компанию: $seats " . seats_word($seats) . "</b> · 🌐 с сайта\n" : "🆕 <b>Новая бронь #$bid</b> · 🌐 с сайта\n") . DIV . "\n"
             . '👤 ' . esc($name) . " · $pretty\n"
             . '🕹 ' . ZONES[$zone]['name'] . ($seats > 1 ? " · 👥 $seats " . seats_word($seats) : '') . "\n"
             . '🎟 ' . TARIFFS[$tariff][0] . "\n"
             . '📅 ' . fmt_dt($start) . "\n"
             . ($seats > 1 ? "💰 $seats × $price ₽ = $total ₽\n🔖 $idsTxt" : "💰 $price ₽"));
-    }
 
     return [
         'ok'     => true,

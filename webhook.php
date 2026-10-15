@@ -314,13 +314,11 @@ function do_confirm(int $chat, int $msgId, string $cbId): void {
         [[btn('🏠 В меню', 'menu')]]);
     answer_cb($cbId, 'Бронь создана! 🎉');
     $u = get_user($chat);
-    foreach (ADMIN_IDS as $aid) {
-        send($aid, "🆕 <b>Новая бронь #$bid</b>\n" . DIV . "\n"
-            . '👤 ' . esc(display_name($u)) . ' · ' . ($u['phone'] ?: '—') . "\n"
-            . '🕹 ' . ZONES[$d['zone']]['name'] . "\n"
-            . '🎟 ' . TARIFFS[$d['tariff']][0] . "\n"
-            . '📅 ' . fmt_dt($start) . "\n💰 $price ₽");
-    }
+    notify_staff("🆕 <b>Новая бронь #$bid</b> · 🤖 из бота\n" . DIV . "\n"
+        . '👤 ' . esc(display_name($u)) . ' · ' . esc($u['phone'] ?: '—') . "\n"
+        . '🕹 ' . ZONES[$d['zone']]['name'] . "\n"
+        . '🎟 ' . TARIFFS[$d['tariff']][0] . "\n"
+        . '📅 ' . fmt_dt($start) . "\n💰 $price ₽");
 }
 
 // ══════════ АДМИН ══════════
@@ -490,7 +488,33 @@ function handle_update(array $upd): void {
     elseif (isset($upd['callback_query'])) handle_callback($upd['callback_query']);
 }
 
+/**
+ * Сообщение не из личного чата (рабочая группа, канал). Бот там ничего не
+ * записывает и не отвечает, кроме /chatid — по ней админ узнаёт id группы
+ * (и темы, если в группе включены темы), чтобы вписать его в config.php.
+ */
+function handle_group_message(array $m): void {
+    $text = trim($m['text'] ?? '');
+    if (!preg_match('#^/chatid(@\w+)?\b#i', $text)) return;
+    $chat = (int)$m['chat']['id'];
+    $thread = isset($m['message_thread_id']) && !empty($m['is_topic_message']) ? (int)$m['message_thread_id'] : 0;
+    $uid = (int)($m['from']['id'] ?? 0);
+    $p = ['chat_id' => $chat, 'parse_mode' => 'HTML'];
+    if ($thread) $p['message_thread_id'] = $thread;
+    if (!is_admin($uid)) {
+        $p['text'] = 'Эта команда — для администраторов клуба.';
+    } else {
+        $p['text'] = "🛠 <b>Рабочий чат</b>\n" . DIV . "\n"
+            . "Впиши в <code>config.php</code> на сервере:\n\n"
+            . "<code>const WORK_CHAT_ID = $chat;</code>\n"
+            . ($thread ? "<code>const WORK_CHAT_THREAD = $thread;</code>  ← эта тема\n" : '')
+            . "\nПотом: <code>systemctl restart gameplay-bot</code>";
+    }
+    api('sendMessage', $p);
+}
+
 function handle_message(array $m): void {
+    if (($m['chat']['type'] ?? 'private') !== 'private') { handle_group_message($m); return; }
     $chat = (int)$m['chat']['id'];
     $name = trim(($m['from']['first_name'] ?? '') . ' ' . ($m['from']['last_name'] ?? ''));
     save_user($chat, $name ?: ('id' . $chat));
@@ -574,6 +598,7 @@ function after_phone(int $chat): void {
 }
 
 function handle_callback(array $cb): void {
+    if (($cb['message']['chat']['type'] ?? 'private') !== 'private') { answer_cb($cb['id']); return; }
     $chat = (int)$cb['message']['chat']['id'];
     $msgId = (int)$cb['message']['message_id'];
     $cbId = $cb['id'];
@@ -656,9 +681,8 @@ function handle_callback(array $cb): void {
         [$t, $k] = view_my($uid);
         edit($chat, $msgId, $t, $k);
         $u = get_user($uid);
-        foreach (ADMIN_IDS as $aid) {
-            send($aid, "❌ <b>Отмена брони #$bid</b>\n👤 " . esc(display_name($u)) . ' · ' . ($u['phone'] ?: '—'));
-        }
+        notify_staff("❌ <b>Отмена брони #$bid</b>\n👤 " . esc(display_name($u)) . ' · ' . esc($u['phone'] ?: '—') . "\n"
+            . '🕹 ' . ZONES[$r['zone']]['name'] . ' · 📅 ' . fmt_dt(new DateTime($r['start'])));
         return;
     }
 

@@ -240,6 +240,9 @@ function esc(string $s): string {
 function api(string $method, array $params = []): ?array {
     if (defined('GP_TEST')) {                       // для тестов без сети
         $GLOBALS['gp_calls'][] = [$method, $params];
+        if (isset($GLOBALS['gp_fail_chat']) && ($params['chat_id'] ?? null) === $GLOBALS['gp_fail_chat']) {
+            return ['ok' => false, 'error_code' => 403, 'description' => 'Forbidden: bot is not a member of the group chat'];
+        }
         return ['ok' => true, 'result' => ['message_id' => 1]];
     }
     $ch = curl_init("https://api.telegram.org/bot" . BOT_TOKEN . "/$method");
@@ -258,6 +261,37 @@ function api(string $method, array $params = []): ?array {
     $res = curl_exec($ch);
     curl_close($ch);
     return $res ? json_decode($res, true) : null;
+}
+
+/**
+ * Уведомление персонала клуба: новые брони, отмены.
+ *
+ * Если в config.php задан WORK_CHAT_ID (id рабочей группы — он отрицательный,
+ * вида -100…), сообщение уходит в эту группу. Админам лично оно дублируется,
+ * только если ADMIN_DM_TOO = true. Если группа недоступна (бота удалили,
+ * группу пересоздали), сообщение уходит админам лично, чтобы бронь не потерялась.
+ * Без WORK_CHAT_ID всё работает как раньше — админам в личку.
+ *
+ * Отдельная функция нужна потому, что send() пропускает отрицательные id:
+ * так помечены клиенты сайта, и писать им в Telegram нельзя.
+ */
+function notify_staff(string $text): void {
+    $wc = defined('WORK_CHAT_ID') ? (int)WORK_CHAT_ID : 0;
+    $dm = true;
+    if ($wc !== 0) {
+        $p = ['chat_id' => $wc, 'text' => $text, 'parse_mode' => 'HTML', 'disable_web_page_preview' => true];
+        if (defined('WORK_CHAT_THREAD') && (int)WORK_CHAT_THREAD > 0) $p['message_thread_id'] = (int)WORK_CHAT_THREAD;
+        $r = api('sendMessage', $p);
+        if (is_array($r) && !empty($r['ok'])) {
+            $dm = defined('ADMIN_DM_TOO') && ADMIN_DM_TOO;
+        } else {
+            $why = is_array($r) ? ($r['description'] ?? 'ошибка') : 'нет ответа';
+            $mig = is_array($r) ? ($r['parameters']['migrate_to_chat_id'] ?? null) : null;
+            error_log('[notify_staff] рабочий чат ' . $wc . ' недоступен: ' . $why . ($mig ? " — новый id группы $mig, впиши его в WORK_CHAT_ID" : ''));
+            $text = "⚠️ <i>Не удалось отправить в рабочий чат ($why). Проверь, что бот в группе и WORK_CHAT_ID верный" . ($mig ? ": новый id <code>$mig</code>" : '') . ".</i>\n\n" . $text;
+        }
+    }
+    if ($dm) foreach (ADMIN_IDS as $aid) send((int)$aid, $text);
 }
 
 function send(int $chat, string $text, ?array $kbRows = null): void {
