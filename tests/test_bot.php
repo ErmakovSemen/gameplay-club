@@ -304,14 +304,25 @@ is_eq('не-админ не видит админ-экраны', count(calls_of(
 // админ снимает бронь
 $slot2 = new DateTime('2026-12-03 15:00');
 $bid2 = add_booking(4001, 'normal', $slot2->format('c'), 1, 'kiber', 120);
-as_click($adm, 'acancel:' . $bid2);
+as_click($adm, 'acancel:' . $bid2 . ':a');
+is_eq('«Снять» сначала спрашивает подтверждение',
+    db()->query("SELECT status FROM bookings WHERE id=$bid2")->fetchColumn(), 'active');
+ok('в подтверждении есть «Да, снять» и «Назад»', str_contains(sent_text(), 'Снять бронь #' . $bid2)
+    && str_contains(json_encode(calls_of('editMessageText'), JSON_UNESCAPED_UNICODE), "acancelok:$bid2:a"));
+as_click($adm, "acancelok:$bid2:a");
 is_eq('админ снял бронь',
     db()->query("SELECT status FROM bookings WHERE id=$bid2")->fetchColumn(), 'cancelled');
 ok('клиенту пришло уведомление об отмене',
     str_contains(sent_text(), 'отменена администратором'));
+is_eq('в базе записано, кто снял', db()->query("SELECT staff FROM bookings WHERE id=$bid2")->fetchColumn(), 'Тест Юзер');
+as_click($adm, "acancelok:$bid2:a");
+ok('повторное снятие — «уже снята»', str_contains(sent_text(), 'уже снята'));
 
 as_click(4001, 'acancel:' . $bid);
-ok('не-админ не может снять чужую бронь', !str_contains(sent_text(), 'снята'));
+ok('не-админ не может снять чужую бронь', !str_contains(sent_text(), 'снята') && !str_contains(sent_text(), 'Снять бронь'));
+$bid3 = add_booking(4001, 'normal', (new DateTime('2026-12-04 15:00'))->format('c'), 1, 'kiber', 120);
+as_click(4001, "acancelok:$bid3:a");
+is_eq('не-админ не может подтвердить снятие', db()->query("SELECT status FROM bookings WHERE id=$bid3")->fetchColumn(), 'active');
 
 // ══════════════════════════════════════════════════════════
 group('9. Ночной тариф');
@@ -849,6 +860,196 @@ $ex = file_get_contents("$root/config.example.php");
 ok('config.example.php объясняет WORK_CHAT_ID', str_contains($ex, 'WORK_CHAT_ID') && str_contains($ex, '/chatid'));
 $code = file_get_contents("$root/webhook.php") . file_get_contents("$root/site_booking.php");
 ok('уведомления о бронях больше не шлются напрямую через ADMIN_IDS', !preg_match('#foreach \(ADMIN_IDS#', $code));
+
+// ══════════════════════════════════════════════════════════
+group('21. Персонал: кнопки под бронями, команды, напоминания');
+
+// миграция старой базы: новые поля добавляются, начавшиеся брони не напоминаются
+$mdb = sys_get_temp_dir() . '/gp_migr_' . getmypid() . '.db';
+@unlink($mdb);
+$mp = new PDO('sqlite:' . $mdb);
+$mp->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$mp->exec("CREATE TABLE bookings (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, zone TEXT NOT NULL,
+    start TEXT NOT NULL, hours INTEGER NOT NULL, tariff TEXT NOT NULL, price INTEGER NOT NULL,
+    status TEXT DEFAULT 'active', reminded INTEGER DEFAULT 0, created TEXT)");
+$mp->prepare('INSERT INTO bookings (user_id, zone, start, hours, tariff, price) VALUES (1,?,?,1,?,100)')->execute(['normal', (new DateTime('-2 hour'))->format('c'), 'kiber']);
+$mp->prepare('INSERT INTO bookings (user_id, zone, start, hours, tariff, price) VALUES (1,?,?,1,?,100)')->execute(['normal', (new DateTime('+1 day'))->format('c'), 'kiber']);
+db_migrate($mp);
+$mcols = array_column($mp->query('PRAGMA table_info(bookings)')->fetchAll(PDO::FETCH_ASSOC), 'name');
+ok('миграция добавила arrived_at, staff, staff_at, pinged', !array_diff(['arrived_at', 'staff', 'staff_at', 'pinged'], $mcols));
+is_eq('начавшаяся бронь помечена как «уже напомнили»', (int)$mp->query('SELECT pinged FROM bookings WHERE id=1')->fetchColumn(), 1);
+is_eq('будущая бронь — нет', (int)$mp->query('SELECT pinged FROM bookings WHERE id=2')->fetchColumn(), 0);
+$again = true; try { db_migrate($mp); } catch (Throwable $e) { $again = false; }
+ok('повторная миграция не падает', $again);
+is_eq('старые брони на месте', (int)$mp->query('SELECT COUNT(*) FROM bookings')->fetchColumn(), 2);
+$mp = null; @unlink($mdb);
+
+$WC2 = work_chat_id();
+function wc_click(int $from, string $data, string $name = 'Аня', ?int $chat = null, string $type = 'supergroup'): void {
+    calls_reset();
+    handle_update(['callback_query' => ['id' => 'w', 'from' => ['id' => $from, 'first_name' => $name], 'data' => $data,
+        'message' => ['message_id' => 77, 'chat' => ['id' => $chat ?? work_chat_id(), 'type' => $type]]]]);
+}
+function wc_group_cmd(string $text, int $from = 7777, ?int $chat = null): void {
+    calls_reset();
+    handle_update(['message' => ['message_id' => 8, 'chat' => ['id' => $chat ?? work_chat_id(), 'type' => 'supergroup'],
+        'from' => ['id' => $from, 'first_name' => 'Аня'], 'text' => $text]]);
+}
+function last_edit(): array { $e = calls_of('editMessageText'); return $e ? $e[count($e) - 1][1] : []; }
+function kb_data(array $p): string { return json_encode($p['reply_markup']['inline_keyboard'] ?? [], JSON_UNESCAPED_UNICODE); }
+function alert_text(): string { $a = calls_of('answerCallbackQuery'); return $a ? (string)($a[0][1]['text'] ?? '') : ''; }
+$stOf = fn(int $id) => booking_get($id);
+
+// карточка новой брони с сайта: кнопки под ней
+$tm2 = (new DateTime('today +4 day'))->format('Y-m-d');
+calls_reset();
+$s1 = site_book(['zone' => 'normal', 'tariff' => 'tripl', 'date' => $tm2, 'hour' => 12, 'name' => 'Олег', 'phone' => '79990003301', 'consent' => true]);
+$card = array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $WC2))[0][1] ?? [];
+ok('карточка брони пришла в рабочий чат с кнопками', str_contains(kb_data($card), "st:arr:{$s1['id']}:b")
+    && str_contains(kb_data($card), "st:nos:{$s1['id']}:b") && str_contains(kb_data($card), "st:can:{$s1['id']}:b"));
+ok('в карточке — время до конца и «ждём гостя»', str_contains($card['text'] ?? '', '12:00 – 15:00') && str_contains($card['text'] ?? '', 'Ждём гостя'));
+
+calls_reset();
+$s2 = site_book(['zone' => 'bootcamp', 'tariff' => 'kiber', 'date' => $tm2, 'hour' => 14, 'seats' => 3, 'name' => 'Компания Б', 'phone' => '79990003302', 'consent' => true]);
+$card2 = array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $WC2))[0][1] ?? [];
+ok('у брони на компанию кнопки во множественном числе', str_contains(kb_data($card2), 'Пришли') && str_contains(kb_data($card2), 'Снять всю бронь'));
+
+// «Пришли» — любой участник рабочего чата, отмечается вся компания
+wc_click(7777, "st:arr:{$s2['id']}:b");
+$arr = array_map(fn($id) => $stOf($id)['arrived_at'], $s2['ids']);
+ok('«Пришли» отметило все 3 места', count(array_filter($arr)) === 3);
+is_eq('записано, кто отметил', $stOf($s2['ids'][2])['staff'], 'Аня');
+ok('карточка обновилась: «Пришли · Аня», кнопок больше нет', str_contains(last_edit()['text'] ?? '', 'Пришли · Аня') && kb_data(last_edit()) === '[]');
+ok('места после прихода остаются занятыми', free_seats('bootcamp', new DateTime("$tm2 14:00"), 1) === ZONES['bootcamp']['cap'] - 3);
+wc_click(7777, "st:arr:{$s2['id']}:b");
+ok('повторное нажатие — «уже всё решено»', str_contains(alert_text(), 'уже всё решено'));
+
+// «Не пришёл» до начала брони нельзя
+wc_click(7777, "st:nos:{$s1['id']}:b");
+ok('«Не пришёл» до начала — подсказка, статус не меняется', str_contains(alert_text(), 'начнётся в 12:00') && $stOf($s1['id'])['status'] === 'active');
+wc_click(7777, "st:nosok:{$s1['id']}:b");
+is_eq('и подделанное «да, не пришёл» до начала не срабатывает', $stOf($s1['id'])['status'], 'active');
+
+// «Снять бронь» — с подтверждением
+wc_click(7777, "st:can:{$s1['id']}:b");
+ok('«Снять» просит подтвердить', str_contains(kb_data(last_edit()), "st:canok:{$s1['id']}:b") && $stOf($s1['id'])['status'] === 'active');
+wc_click(7777, "st:back:{$s1['id']}:b");
+ok('«Назад» возвращает кнопки', str_contains(kb_data(last_edit()), "st:arr:{$s1['id']}:b"));
+$freeBefore = free_seats('normal', new DateTime("$tm2 12:00"), 3);
+wc_click(7777, "st:canok:{$s1['id']}:b", 'Борис');
+is_eq('бронь снята', $stOf($s1['id'])['status'], 'cancelled');
+is_eq('место освободилось', free_seats('normal', new DateTime("$tm2 12:00"), 3), $freeBefore + 1);
+ok('карточка: «снята · Борис» и подсказка позвонить клиенту с сайта', str_contains(last_edit()['text'] ?? '', 'Бронь снята · Борис')
+    && str_contains(last_edit()['text'] ?? '', 'позвоните: +7 999 000 33 01'));
+ok('нажавшему — всплывающее окно с телефоном клиента', str_contains(alert_text(), '+7 999 000 33 01'));
+
+// «Не пришёл» после начала: место освобождается, гостю из бота — сообщение
+$botG = 555002;
+db()->prepare('INSERT OR REPLACE INTO users (id, name, real_name, phone, created) VALUES (?,?,?,?,?)')->execute([$botG, 'Гоша', 'Гоша', '+79990003303', date('c')]);
+$startedAt = (new DateTime(date('Y-m-d H:00')))->modify('-1 hour');
+$nb = add_booking($botG, 'ps_vip', $startedAt->format('c'), 3, 'tripl', 900);
+wc_click(7777, "st:nos:$nb:n");
+ok('после начала «Не пришёл» просит подтвердить', str_contains(kb_data(last_edit()), "st:nosok:$nb:n"));
+wc_click(7777, "st:nosok:$nb:n");
+is_eq('статус «не пришёл»', $stOf($nb)['status'], 'noshow');
+is_eq('PS5 Pro снова свободна', free_seats('ps_vip', new DateTime(date('Y-m-d H:00')), 1), 1);
+ok('гостю из бота пришло сообщение', str_contains(sent_text(), 'не дождались') && count(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $botG)) === 1);
+ok('в карточке — «Не пришёл — место освобождено»', str_contains(last_edit()['text'] ?? '', 'Не пришёл — место освобождено'));
+
+// кто может нажимать
+$gb = add_booking($botG, 'normal', (new DateTime('+2 day'))->format('Y-m-d 18:00:00+03:00'), 1, 'kiber', 140);
+wc_click(7777, "st:arr:$gb:b", 'Чужой', -100111222333);
+ok('из чужой группы кнопки не работают', str_contains(alert_text(), 'для персонала') && !$stOf($gb)['arrived_at']);
+wc_click(4242, "st:arr:$gb:b", 'Гость', 4242, 'private');
+ok('в личке не-админу кнопки не работают', !$stOf($gb)['arrived_at']);
+wc_click(1001, "st:arr:$gb:b", 'Админ', 1001, 'private');
+ok('в личке админу кнопки работают (копия уведомления)', (bool)$stOf($gb)['arrived_at']);
+wc_click(7777, 'st:drop:1:b');
+ok('неизвестное действие игнорируется', !calls_of('editMessageText'));
+
+// команды в рабочем чате
+wc_group_cmd('/today');
+$tt = calls_of('sendMessage')[0][1] ?? [];
+ok('/today отвечает в рабочий чат', ($tt['chat_id'] ?? 0) === $WC2 && str_contains($tt['text'] ?? '', 'Брони на сегодня'));
+wc_group_cmd('/now@GamePlayCC_bot');
+ok('/now показывает зоны и «в ближайший час»', str_contains(sent_text(), 'Сейчас в клубе') && str_contains(sent_text(), 'В ближайший час'));
+wc_group_cmd('/help');
+ok('/help объясняет кнопки', str_contains(sent_text(), 'Кнопки под бронью') && str_contains(sent_text(), '/today'));
+wc_group_cmd('/today', 7777, -100111222333);
+is_eq('в чужой группе /today молчит', count($GLOBALS['gp_calls']), 0);
+as_message(1001, '/today');
+ok('админу /today работает и в личке', str_contains(sent_text(), 'Брони на сегодня'));
+as_message(4242, '/now');
+is_eq('не-админу в личке /now не отвечает', count(calls_of('sendMessage')), 0);
+$tday = staff_today_text(new DateTime($tm2));
+ok('в /today брони на компанию собраны в одну строку ×3', str_contains($tday, '×3') && substr_count($tday, 'Компания Б') === 1);
+
+// фоновые задачи: напоминание «гость не отмечен» и утренняя сводка
+db()->exec('UPDATE bookings SET pinged=1');
+$late = add_booking($botG, 'normal', $startedAt->format('c'), 3, 'tripl', 360);
+$late2 = add_booking($botG, 'normal', $startedAt->format('c'), 3, 'tripl', 360);
+$okArr = add_booking(555003, 'bootcamp', $startedAt->format('c'), 3, 'tripl', 450);
+db()->prepare('UPDATE bookings SET arrived_at=? WHERE id=?')->execute([date('c'), $okArr]);
+$ended = add_booking(555004, 'normal', (new DateTime(date('Y-m-d H:00')))->modify('-3 hour')->format('c'), 1, 'kiber', 140);
+$future = add_booking(555005, 'normal', (new DateTime('+1 day'))->format('c'), 1, 'kiber', 140);
+calls_reset(); staff_tick();
+$nudges = array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $WC2 && str_contains($c[1]['text'], 'Гость не отмечен')));
+is_eq('одно напоминание на компанию из 2 мест', count($nudges), 1);
+ok('напоминание с кнопками и пометкой n', str_contains(kb_data($nudges[0][1] ?? []), "st:arr:$late:n"));
+ok('отмеченных, закончившихся и будущих не напоминает', !preg_match("/#($okArr|$ended|$future)\\b/", $nudges[0][1]['text'] ?? ''));
+is_eq('закончившаяся бронь помечена, чтобы не всплыть позже', (int)$stOf($ended)['pinged'], 1);
+is_eq('будущая — нет', (int)$stOf($future)['pinged'], 0);
+calls_reset(); staff_tick();
+is_eq('повторный запуск не дублирует напоминание', count(calls_of('sendMessage')), 0);
+
+db()->exec('UPDATE bookings SET pinged=1');
+$dday = (new DateTime('today +5 day'))->format('Y-m-d');
+calls_reset(); staff_tick(new DateTime("$dday 09:30"));
+is_eq('до DIGEST_HOUR сводки нет', count(calls_of('sendMessage')), 0);
+calls_reset(); staff_tick(new DateTime("$dday 10:05"));
+ok('в 10:05 — утренняя сводка в рабочий чат', count(calls_of('sendMessage')) === 1 && str_contains(sent_text(), 'Доброе утро'));
+calls_reset(); staff_tick(new DateTime("$dday 11:40"));
+is_eq('сводка — один раз в день', count(calls_of('sendMessage')), 0);
+calls_reset(); staff_tick(new DateTime((new DateTime('today +6 day'))->format('Y-m-d') . ' 15:00'));
+is_eq('после окна в 3 часа сводка не уходит', count(calls_of('sendMessage')), 0);
+
+// снятие из /admin — уведомление в рабочий чат
+calls_reset();
+$s3 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm2, 'hour' => 20, 'name' => 'Вера', 'phone' => '79990003304', 'consent' => true]);
+as_click(1001, "acancel:{$s3['id']}:d0");
+ok('в подтверждении сказано, что клиенту с сайта надо позвонить', str_contains(sent_text(), 'Telegram у него нет'));
+as_click(1001, "acancelok:{$s3['id']}:d0");
+$wcMsg = array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === $WC2));
+ok('в рабочий чат: «снята администратором · Тест Юзер» и «позвоните»', $wcMsg && str_contains($wcMsg[0][1]['text'], 'снята администратором</b> · Тест Юзер')
+    && str_contains($wcMsg[0][1]['text'], 'позвоните'));
+ok('админу — окно с телефоном клиента', str_contains(alert_text(), '+7 999 000 33 04'));
+ok('после снятия — снова список броней на день', str_contains(last_edit()['text'] ?? '', 'Брони ·'));
+
+// статистика и CSV понимают новые статусы
+as_click(1001, 'adm:stats');
+ok('статистика: неявки, сайт/бот, отмены по источнику', str_contains(sent_text(), 'Не пришли') && str_contains(sent_text(), 'с сайта')
+    && str_contains(sent_text(), 'персоналом'));
+as_click(1001, 'adm:export');
+ok('CSV-отчёт по-прежнему формируется', count(calls_of('sendDocument')) === 1);
+ok('в списках /admin видно «не пришёл» и кто отметил', str_contains(booking_line(booking_get($nb)), '🚫 не пришёл · Аня'));
+ok('…и «пришёл»', str_contains(booking_line(booking_get($okArr)), '✅ пришёл'));
+
+// если рабочий чат недоступен — карточка с кнопками уходит админу в личку
+$GLOBALS['gp_fail_chat'] = $WC2; calls_reset();
+$s4 = site_book(['zone' => 'normal', 'tariff' => 'kiber', 'date' => $tm2, 'hour' => 21, 'name' => 'Запас 2', 'phone' => '79990003305', 'consent' => true]);
+$dm = array_values(array_filter(calls_of('sendMessage'), fn($c) => $c[1]['chat_id'] === 1001));
+ok('админ получил карточку с кнопками в личку', $dm && str_contains(kb_data($dm[0][1]), "st:arr:{$s4['id']}:b"));
+unset($GLOBALS['gp_fail_chat']);
+
+// подсказки команд и текст для гостей
+calls_reset(); staff_register_commands();
+$cmds = calls_of('setMyCommands');
+ok('команды /today /now /help зарегистрированы для рабочего чата', (bool)array_filter($cmds, fn($c) => ($c[1]['scope']['chat_id'] ?? 0) === $WC2));
+ok('админам в личке — ещё /admin', (bool)array_filter($cmds, fn($c) => ($c[1]['scope']['chat_id'] ?? 0) === 1001 && str_contains(json_encode($c[1]['commands']), 'admin')));
+as_click(4242, 'load');
+ok('гостям «Загруженность» учитывает и брони с сайта', str_contains(sent_text(), 'с сайта и из бота'));
+$code2 = file_get_contents("$root/staff.php");
+ok('staff.php закрыт от прямого доступа', str_contains(file_get_contents("$root/nginx/gameplay.conf.template"), '/staff.php') && str_contains(file_get_contents("$root/.htaccess"), 'staff.php'));
 
 // ══════════════════════════════════════════════════════════
 // ИТОГ

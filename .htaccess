@@ -8,6 +8,9 @@
 <Files "site_booking.php">
     Require all denied
 </Files>
+<Files "staff.php">
+    Require all denied
+</Files>
 <Files "privacy_cleanup.php">
     Require all denied
 </Files>

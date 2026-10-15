@@ -7,7 +7,7 @@
  * ════════════════════════════════════════════════════════
  */
 
-require_once __DIR__ . '/core.php';
+require_once __DIR__ . '/staff.php';
 
 // GP_TEST — тесты, GP_POLL — режим опроса (poller.php).
 // В обоих случаях этот файл подключают ради функций, а не ради обработки запроса.
@@ -77,7 +77,7 @@ function view_load(): array {
         $lines[] = $ft->format('H:00') . '  ' . bar($busy, $cap) . '  ' . ($cap - $busy) . ' св.';
     }
     $lines[] = DIV;
-    $lines[] = '<i>Учитываются брони через бота. Живая очередь — по телефону 👇</i>';
+    $lines[] = '<i>Учитываются онлайн-брони с сайта и из бота. Живая очередь — по телефону 👇</i>';
     $lines[] = '☎️ ' . CLUB_PHONE;
     return [implode("\n", $lines),
             [[btn('🎮 Забронировать', 'book')], [btn('⬅️ Назад', 'menu')]]];
@@ -313,12 +313,7 @@ function do_confirm(int $chat, int $msgId, string $cbId): void {
         . 'Очень ждём тебя! Хорошей игры 💜⚡',
         [[btn('🏠 В меню', 'menu')]]);
     answer_cb($cbId, 'Бронь создана! 🎉');
-    $u = get_user($chat);
-    notify_staff("🆕 <b>Новая бронь #$bid</b> · 🤖 из бота\n" . DIV . "\n"
-        . '👤 ' . esc(display_name($u)) . ' · ' . esc($u['phone'] ?: '—') . "\n"
-        . '🕹 ' . ZONES[$d['zone']]['name'] . "\n"
-        . '🎟 ' . TARIFFS[$d['tariff']][0] . "\n"
-        . '📅 ' . fmt_dt($start) . "\n💰 $price ₽");
+    notify_booking($bid);
 }
 
 // ══════════ АДМИН ══════════
@@ -334,10 +329,10 @@ function admin_kb(): array {
 
 function booking_line(array $r): string {
     $u = get_user((int)$r['user_id']);
-    $st = STATUS_RU[$r['status']] ?? $r['status'];
+    $st = state_label($r) . (!empty($r['staff']) && booking_state($r) !== 'wait' ? ' · ' . esc($r['staff']) : '');
     $phone = $u && $u['phone'] ? $u['phone'] : '—';
     return "<b>#{$r['id']}</b> · " . fmt_range($r) . ' · ' . ZONES[$r['zone']]['name'] . "\n"
-        . '     👤 ' . esc(display_name($u)) . " · $phone\n"
+        . '     👤 ' . esc(display_name($u)) . ' · ' . esc($phone) . ((int)$r['user_id'] < 0 ? ' · 🌐' : '') . "\n"
         . '     🎟 ' . TARIFFS[$r['tariff']][0] . " · 💰 {$r['price']} ₽ · $st";
 }
 
@@ -352,7 +347,7 @@ function adm_day(int $chat, int $msgId, int $off): void {
     if (!$rows) $lines[] = 'Броней на этот день нет.';
     foreach ($rows as $r) {
         $lines[] = booking_line($r) . "\n";
-        if ($r['status'] === 'active') $btns[] = [btn("❌ Снять #{$r['id']}", "acancel:{$r['id']}")];
+        if ($r['status'] === 'active') $btns[] = [btn("❌ Снять #{$r['id']}", "acancel:{$r['id']}:d$off")];
     }
     $btns[] = [btn('⬅️ В админ-меню', 'adm:menu')];
     edit($chat, $msgId, implode("\n", $lines), $btns);
@@ -398,8 +393,9 @@ function adm_all(int $chat, int $msgId): void {
         $u = get_user((int)$r['user_id']);
         $phone = $u && $u['phone'] ? $u['phone'] : '—';
         $lines[] = "<b>#{$r['id']}</b> · " . fmt_dt($s) . ' · ' . ZONES[$r['zone']]['name'] . "\n"
-            . '     👤 ' . esc(display_name($u)) . " · $phone · {$r['price']} ₽";
-        $btns[] = [btn("❌ Снять #{$r['id']}", "acancel:{$r['id']}")];
+            . '     👤 ' . esc(display_name($u)) . ' · ' . esc($phone) . ((int)$r['user_id'] < 0 ? ' · 🌐' : '')
+            . " · {$r['price']} ₽ · " . state_label($r);
+        $btns[] = [btn("❌ Снять #{$r['id']}", "acancel:{$r['id']}:a")];
     }
     $btns[] = [btn('⬅️ В админ-меню', 'adm:menu')];
     edit($chat, $msgId, implode("\n", $lines), $btns);
@@ -407,20 +403,32 @@ function adm_all(int $chat, int $msgId): void {
 
 function adm_stats(int $chat, int $msgId): void {
     $month = date('Y-m');
-    $t = db()->prepare("SELECT COUNT(*) c, COALESCE(SUM(price),0) s FROM bookings
-                        WHERE status='active' AND start LIKE ?");
-    $t->execute([$month . '%']);
-    $total = $t->fetch(PDO::FETCH_ASSOC);
-    $c = db()->prepare("SELECT COUNT(*) c FROM bookings WHERE status='cancelled' AND start LIKE ?");
-    $c->execute([$month . '%']);
-    $cancelled = $c->fetch(PDO::FETCH_ASSOC);
-    $users = db()->query('SELECT COUNT(*) c FROM users')->fetch(PDO::FETCH_ASSOC);
+    $st = db()->prepare('SELECT * FROM bookings WHERE start LIKE ?');
+    $st->execute([$month . '%']);
+    $c = ['wait' => 0, 'arrived' => 0, 'noshow' => 0, 'removed' => 0, 'cancelled' => 0, 'done' => 0];
+    $site = 0; $bot = 0; $sum = 0;
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $s = booking_state($r);
+        $c[$s] = ($c[$s] ?? 0) + 1;
+        if (in_array($s, ['wait', 'arrived', 'done'], true)) {
+            $sum += (int)$r['price'];
+            if ((int)$r['user_id'] < 0) $site++; else $bot++;
+        }
+    }
+    $kept = $c['wait'] + $c['arrived'] + $c['done'];
+    $marked = $c['arrived'] + $c['noshow'];
+    $clients = db()->query('SELECT SUM(id > 0) b, SUM(id < 0) s FROM users')->fetch(PDO::FETCH_ASSOC);
     edit($chat, $msgId,
-        "📈 <b>Статистика · $month</b>\n" . DIV . "\n"
-        . "🧾 Активных броней за месяц: <b>{$total['c']}</b>\n"
-        . "❌ Отмен за месяц: <b>{$cancelled['c']}</b>\n"
-        . "💰 Сумма активных броней: <b>{$total['s']} ₽</b>\n"
-        . "👥 Пользователей бота: <b>{$users['c']}</b>",
+        "📈 <b>Статистика · $month</b>\n<i>места по дате начала брони</i>\n" . DIV . "\n"
+        . "🧾 Броней (мест) без отмен: <b>$kept</b>\n"
+        . "     🌐 с сайта: <b>$site</b> · 🤖 из бота: <b>$bot</b>\n"
+        . "✅ Отмечены «пришёл»: <b>{$c['arrived']}</b>\n"
+        . "🚫 Не пришли: <b>{$c['noshow']}</b>"
+        . ($marked ? ' (' . round($c['noshow'] / $marked * 100) . '% от отмеченных)' : '') . "\n"
+        . '❌ Отмены: <b>' . ($c['removed'] + $c['cancelled']) . "</b> (гостем {$c['cancelled']}, персоналом {$c['removed']})\n"
+        . "💰 Сумма броней без отмен и неявок: <b>$sum ₽</b>\n"
+        . "<i>это стоимость броней, а не полученные деньги</i>\n"
+        . '👥 Клиентов в базе: <b>' . ((int)$clients['b'] + (int)$clients['s']) . '</b> (бот ' . (int)$clients['b'] . ', сайт ' . (int)$clients['s'] . ')',
         [[btn('⬅️ В админ-меню', 'adm:menu')]]);
 }
 
@@ -429,7 +437,7 @@ function adm_export(int $chat, string $cbId): void {
     $rows = db()->query('SELECT * FROM bookings ORDER BY start DESC')->fetchAll(PDO::FETCH_ASSOC);
     $csv = "\xEF\xBB\xBF";  // BOM, чтобы Excel открыл кириллицу
     $head = ['№', 'Дата', 'День', 'Начало', 'Конец', 'Зона', 'Тариф', 'Часов',
-             'Цена ₽', 'Статус', 'Имя', 'Телефон', 'Имя в TG', 'Создана'];
+             'Цена ₽', 'Статус', 'Имя', 'Телефон', 'Имя в TG', 'Создана', 'Источник', 'Пришёл в', 'Отметил'];
     $csv .= implode(';', $head) . "\r\n";
     foreach ($rows as $r) {
         $s = new DateTime($r['start']);
@@ -442,9 +450,12 @@ function adm_export(int $chat, string $cbId): void {
             trim(preg_replace('/^\S+\s/u', '', ZONES[$r['zone']]['name'])),
             trim(explode('·', preg_replace('/^\S+\s/u', '', TARIFFS[$r['tariff']][0]))[0]),
             $r['hours'], $r['price'],
-            trim(preg_replace('/^\S+\s/u', '', STATUS_RU[$r['status']] ?? $r['status'])),
+            trim(preg_replace('/^\S+\s/u', '', state_label($r))),
             $u ? ($u['real_name'] ?: '') : '', $u ? ($u['phone'] ?: '') : '',
             $u ? ($u['name'] ?: '') : '', $cr->format('d.m.Y H:i'),
+            (int)$r['user_id'] < 0 ? 'сайт' : 'бот',
+            $r['arrived_at'] ? (new DateTime($r['arrived_at']))->format('d.m.Y H:i') : '',
+            (string)($r['staff'] ?? ''),
         ];
         $vals = array_map(fn($v) => '"' . str_replace('"', '""', (string)$v) . '"', $vals);
         $csv .= implode(';', $vals) . "\r\n";
@@ -468,17 +479,35 @@ function adm_export(int $chat, string $cbId): void {
     @unlink($tmp);
 }
 
-function adm_cancel(int $chat, string $cbId, int $bid): void {
-    $st = db()->prepare('SELECT * FROM bookings WHERE id=?');
-    $st->execute([$bid]);
-    $r = $st->fetch(PDO::FETCH_ASSOC);
-    if ($r && $r['status'] === 'active') {
-        db()->prepare("UPDATE bookings SET status='cancelled' WHERE id=?")->execute([$bid]);
-        send((int)$r['user_id'], "😔 Бронь <b>#$bid</b> отменена администратором.\nВопросы: ☎️ " . CLUB_PHONE);
-        answer_cb($cbId, "Бронь #$bid снята ✅", true);
-    } else {
-        answer_cb($cbId, 'Бронь не найдена или уже снята', true);
-    }
+/** Куда вернуться из подтверждения: a — «Все активные», dN — «Брони на день N». */
+function adm_back(string $org): string {
+    return preg_match('/^d(\d)$/', $org, $m) ? 'adm:day:' . $m[1] : 'adm:all';
+}
+
+function adm_cancel_ask(int $chat, int $msgId, string $cbId, int $bid, string $org): void {
+    $r = booking_get($bid);
+    if (!$r || $r['status'] !== 'active') { answer_cb($cbId, 'Бронь не найдена или уже снята', true); return; }
+    $site = (int)$r['user_id'] < 0;
+    edit($chat, $msgId, "❓ <b>Снять бронь #$bid?</b>\n" . DIV . "\n" . booking_line($r) . "\n" . DIV . "\n"
+        . 'Место освободится. ' . ($site ? 'Это клиент с сайта: Telegram у него нет, после снятия позвоните ему.' : 'Гостю придёт уведомление в Telegram.'),
+        [[btn('✅ Да, снять', "acancelok:$bid:$org")], [btn('⬅️ Назад', adm_back($org))]]);
+    answer_cb($cbId);
+}
+
+function adm_cancel(int $chat, int $msgId, string $cbId, int $bid, string $org, string $who): void {
+    $r = booking_get($bid);
+    if (!$r || !staff_set_status([$r], 'cancelled', $who)) { answer_cb($cbId, 'Бронь не найдена или уже снята', true); return; }
+    staff_tell_client($r, 'cancelled');
+    $u = get_user((int)$r['user_id']);
+    $phone = $u && $u['phone'] ? $u['phone'] : '—';
+    $site = (int)$r['user_id'] < 0;
+    notify_staff("❌ <b>Бронь #$bid снята администратором</b> · " . esc($who) . "\n"
+        . '👤 ' . esc(display_name($u)) . ' · ' . esc($phone) . "\n"
+        . '🕹 ' . ZONES[$r['zone']]['name'] . ' · 📅 ' . fmt_dt(new DateTime($r['start'])) . "\n"
+        . ($site ? '📞 Клиент с сайта, Telegram у него нет — позвоните ему.' : '💬 Гостю отправлено уведомление в Telegram.'),
+        null, $chat);
+    answer_cb($cbId, "Бронь #$bid снята ✅" . ($site ? "\nКлиент с сайта — позвоните ему: $phone" : ''), true);
+    if (preg_match('/^d(\d)$/', $org, $m)) adm_day($chat, $msgId, (int)$m[1]); else adm_all($chat, $msgId);
 }
 
 // ══════════ РОУТИНГ ══════════
@@ -495,21 +524,30 @@ function handle_update(array $upd): void {
  */
 function handle_group_message(array $m): void {
     $text = trim($m['text'] ?? '');
-    if (!preg_match('#^/chatid(@\w+)?\b#i', $text)) return;
+    if (!preg_match('#^/([a-z_]+)(@\w+)?(\s|$)#i', $text, $mm)) return;
+    $cmd = strtolower($mm[1]);
     $chat = (int)$m['chat']['id'];
     $thread = isset($m['message_thread_id']) && !empty($m['is_topic_message']) ? (int)$m['message_thread_id'] : 0;
-    $uid = (int)($m['from']['id'] ?? 0);
-    $p = ['chat_id' => $chat, 'parse_mode' => 'HTML'];
+    $p = ['chat_id' => $chat, 'parse_mode' => 'HTML', 'disable_web_page_preview' => true];
     if ($thread) $p['message_thread_id'] = $thread;
-    if (!is_admin($uid)) {
-        $p['text'] = 'Эта команда — для администраторов клуба.';
-    } else {
-        $p['text'] = "🛠 <b>Рабочий чат</b>\n" . DIV . "\n"
-            . "Впиши в <code>config.php</code> на сервере:\n\n"
-            . "<code>const WORK_CHAT_ID = $chat;</code>\n"
-            . ($thread ? "<code>const WORK_CHAT_THREAD = $thread;</code>  ← эта тема\n" : '')
-            . "\nПотом: <code>systemctl restart gameplay-bot</code>";
+    if ($cmd === 'chatid') {
+        if (!is_admin((int)($m['from']['id'] ?? 0))) {
+            $p['text'] = 'Эта команда — для администраторов клуба.';
+        } else {
+            $p['text'] = "🛠 <b>Рабочий чат</b>\n" . DIV . "\n"
+                . "Впиши в <code>config.php</code> на сервере:\n\n"
+                . "<code>const WORK_CHAT_ID = $chat;</code>\n"
+                . ($thread ? "<code>const WORK_CHAT_THREAD = $thread;</code>  ← эта тема\n" : '')
+                . "\nПотом: <code>systemctl restart gameplay-bot</code>";
+        }
+        api('sendMessage', $p);
+        return;
     }
+    // остальные команды — только в рабочем чате, в чужих группах бот молчит
+    if (!work_chat_id() || $chat !== work_chat_id()) return;
+    $reply = staff_command($cmd);
+    if ($reply === null) return;
+    $p['text'] = $reply;
     api('sendMessage', $p);
 }
 
@@ -576,6 +614,10 @@ function handle_message(array $m): void {
         case '/admin':
             if (is_admin($chat)) send($chat, "👑 <b>Админ-панель GAME PLAY</b>\n" . DIV . "\nЧто показать?", admin_kb());
             break;
+        case '/today':
+        case '/now':
+            if (is_admin($chat)) send($chat, staff_command(substr($cmd, 1)));
+            break;
         case '/stats':
             if (is_admin($chat)) {
                 // показываем как в панели, но новым сообщением
@@ -598,7 +640,16 @@ function after_phone(int $chat): void {
 }
 
 function handle_callback(array $cb): void {
-    if (($cb['message']['chat']['type'] ?? 'private') !== 'private') { answer_cb($cb['id']); return; }
+    $type = $cb['message']['chat']['type'] ?? 'private';
+    if (str_starts_with($cb['data'] ?? '', 'st:')) {
+        // кнопки под бронями: в рабочем чате — любой его участник, в личке — только админы
+        $allowed = $type === 'private'
+            ? is_admin((int)($cb['from']['id'] ?? 0))
+            : (work_chat_id() !== 0 && (int)($cb['message']['chat']['id'] ?? 0) === work_chat_id());
+        if ($allowed) staff_action($cb); else answer_cb($cb['id'], 'Эти кнопки — для персонала клуба', true);
+        return;
+    }
+    if ($type !== 'private') { answer_cb($cb['id']); return; }
     $chat = (int)$cb['message']['chat']['id'];
     $msgId = (int)$cb['message']['message_id'];
     $cbId = $cb['id'];
@@ -687,7 +738,7 @@ function handle_callback(array $cb): void {
     }
 
     // админ
-    if (str_starts_with($data, 'adm:') || str_starts_with($data, 'acancel:')) {
+    if (str_starts_with($data, 'adm:') || str_starts_with($data, 'acancel')) {
         if (!is_admin($uid)) { answer_cb($cbId); return; }
         if ($data === 'adm:menu') { edit($chat, $msgId, "👑 <b>Админ-панель GAME PLAY</b>\n" . DIV . "\nЧто показать?", admin_kb()); answer_cb($cbId); return; }
         if (str_starts_with($data, 'adm:day:')) { adm_day($chat, $msgId, (int)substr($data, 8)); answer_cb($cbId); return; }
@@ -695,7 +746,8 @@ function handle_callback(array $cb): void {
         if ($data === 'adm:all') { adm_all($chat, $msgId); answer_cb($cbId); return; }
         if ($data === 'adm:stats') { adm_stats($chat, $msgId); answer_cb($cbId); return; }
         if ($data === 'adm:export') { adm_export($chat, $cbId); return; }
-        if (str_starts_with($data, 'acancel:')) { adm_cancel($chat, $cbId, (int)substr($data, 8)); return; }
+        if (preg_match('#^acancel:(\d+)(?::(a|d\d))?$#', $data, $m)) { adm_cancel_ask($chat, $msgId, $cbId, (int)$m[1], $m[2] ?? 'a'); return; }
+        if (preg_match('#^acancelok:(\d+):(a|d\d)$#', $data, $m)) { adm_cancel($chat, $msgId, $cbId, (int)$m[1], $m[2], staff_name($cb['from'])); return; }
     }
 
     answer_cb($cbId);

@@ -44,13 +44,22 @@ if (empty($me['ok'])) {
     log_line('ОШИБКА: Telegram недоступен, getMe не прошёл');
     exit(1);
 }
-log_line('запущен, бот @' . $me['result']['username']);
+log_line('запущен, бот @' . $me['result']['username']
+    . (work_chat_id() ? ', рабочий чат ' . work_chat_id() : ', рабочий чат не задан'));
+staff_register_commands();
 
 $offset = is_file(OFFSET_FILE) ? (int)file_get_contents(OFFSET_FILE) : 0;
 $fails = 0;
+$lastTick = 0;
 
 while ($running) {
     if (function_exists('pcntl_signal_dispatch')) pcntl_signal_dispatch();
+
+    // раз в минуту: напоминания «гость не отмечен» и утренняя сводка (staff.php)
+    if (time() - $lastTick >= 60) {
+        $lastTick = time();
+        try { staff_tick(); } catch (Throwable $e) { log_line('ошибка фоновых задач: ' . $e->getMessage()); }
+    }
 
     $r = api('getUpdates', [
         'offset'  => $offset,

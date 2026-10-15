@@ -49,6 +49,7 @@ const DAY_START       = 8;   // «День»  = старт с 8:00 до 15:59
 const EVENING_START   = 16;  // «Вечер» = старт с 16:00 (и до 7:59 утра)
 const NIGHT_HOUR      = 20;  // ночной пакет 20:00–8:00
 const BOOK_DAYS_AHEAD = 7;
+const BOOKING_HOLD_MIN = 15; // сколько минут держим место после начала брони (см. /terms/)
 
 date_default_timezone_set('Europe/Moscow');
 
@@ -93,7 +94,7 @@ const PRICES = [
 
 const WDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 const DIV = '━━━━━━━━━━━━━━━━━━';
-const STATUS_RU = ['active' => '✅ активна', 'cancelled' => '❌ отменена', 'done' => '🏁 завершена'];
+const STATUS_RU = ['active' => '✅ активна', 'cancelled' => '❌ отменена', 'noshow' => '🚫 не пришёл', 'done' => '🏁 завершена'];
 
 // ══════════ БАЗА ДАННЫХ ══════════
 
@@ -116,8 +117,31 @@ function db(): PDO {
         $pdo->exec('CREATE TABLE IF NOT EXISTS consents (
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
             version TEXT NOT NULL, source TEXT NOT NULL, ts TEXT NOT NULL)');
+        db_migrate($pdo);
     }
     return $pdo;
+}
+
+/**
+ * Новые поля броней для персонала. Добавляются к существующей базе без потери данных.
+ *   arrived_at — когда гость отмечен «пришёл»;
+ *   staff, staff_at — кто из персонала и когда отметил приход / неявку / снял бронь;
+ *   pinged — напоминание «гость не отмечен» уже отправлено в рабочий чат.
+ * Колонка pinged у уже начавшихся броней сразу ставится в 1 — иначе после
+ * обновления в рабочий чат посыпались бы напоминания по старым броням.
+ */
+function db_migrate(PDO $pdo): void {
+    $pdo->exec('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)');
+    $cols = array_column($pdo->query('PRAGMA table_info(bookings)')->fetchAll(PDO::FETCH_ASSOC), 'name');
+    foreach (['arrived_at' => 'TEXT', 'staff' => 'TEXT', 'staff_at' => 'TEXT', 'pinged' => 'INTEGER DEFAULT 0'] as $col => $type) {
+        if (in_array($col, $cols, true)) continue;
+        try {
+            $pdo->exec("ALTER TABLE bookings ADD COLUMN $col $type");
+            if ($col === 'pinged') $pdo->prepare('UPDATE bookings SET pinged=1 WHERE start <= ?')->execute([date('c')]);
+        } catch (PDOException $e) {
+            // колонку только что добавил параллельный процесс (бот и сайт стартуют одновременно)
+        }
+    }
 }
 
 function has_consent(int $uid): bool {
@@ -226,6 +250,13 @@ function fmt_range(array $r): string {
     return $s->format('H:00') . '–' . $e->format('H:00');
 }
 
+function seats_word(int $n): string {
+    $m10 = $n % 10; $m100 = $n % 100;
+    if ($m10 === 1 && $m100 !== 11) return 'место';
+    if ($m10 >= 2 && $m10 <= 4 && ($m100 < 12 || $m100 > 14)) return 'места';
+    return 'мест';
+}
+
 function u_len(string $s): int {
     if (function_exists('mb_strlen')) return mb_strlen($s, 'UTF-8');
     return preg_match_all('/./u', $s) ?: strlen($s);
@@ -275,11 +306,17 @@ function api(string $method, array $params = []): ?array {
  * Отдельная функция нужна потому, что send() пропускает отрицательные id:
  * так помечены клиенты сайта, и писать им в Telegram нельзя.
  */
-function notify_staff(string $text): void {
-    $wc = defined('WORK_CHAT_ID') ? (int)WORK_CHAT_ID : 0;
+function work_chat_id(): int {
+    return defined('WORK_CHAT_ID') ? (int)WORK_CHAT_ID : 0;
+}
+
+/** $kb — кнопки под сообщением; $skipAdmin — админ, которому в личку не дублировать (он сам это сделал). */
+function notify_staff(string $text, ?array $kb = null, int $skipAdmin = 0): void {
+    $wc = work_chat_id();
     $dm = true;
     if ($wc !== 0) {
         $p = ['chat_id' => $wc, 'text' => $text, 'parse_mode' => 'HTML', 'disable_web_page_preview' => true];
+        if ($kb) $p['reply_markup'] = ['inline_keyboard' => $kb];
         if (defined('WORK_CHAT_THREAD') && (int)WORK_CHAT_THREAD > 0) $p['message_thread_id'] = (int)WORK_CHAT_THREAD;
         $r = api('sendMessage', $p);
         if (is_array($r) && !empty($r['ok'])) {
@@ -291,7 +328,7 @@ function notify_staff(string $text): void {
             $text = "⚠️ <i>Не удалось отправить в рабочий чат ($why). Проверь, что бот в группе и WORK_CHAT_ID верный" . ($mig ? ": новый id <code>$mig</code>" : '') . ".</i>\n\n" . $text;
         }
     }
-    if ($dm) foreach (ADMIN_IDS as $aid) send((int)$aid, $text);
+    if ($dm) foreach (ADMIN_IDS as $aid) if ((int)$aid !== $skipAdmin) send((int)$aid, $text, $kb ?: null);
 }
 
 function send(int $chat, string $text, ?array $kbRows = null): void {

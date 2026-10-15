@@ -15,7 +15,7 @@
  * ════════════════════════════════════════════════════════
  */
 
-require_once __DIR__ . '/core.php';
+require_once __DIR__ . '/staff.php';
 
 /** Подписи зон для сайта (в боте — с эмодзи, здесь — чисто). */
 const SITE_ZONES = [
@@ -39,12 +39,6 @@ const SITE_MAX_ACTIVE = 3;
 /** Максимум мест в одной брони на компанию (и не больше вместимости зоны). */
 const SITE_MAX_SEATS = 10;
 
-function seats_word(int $n): string {
-    $m10 = $n % 10; $m100 = $n % 100;
-    if ($m10 === 1 && $m100 !== 11) return 'место';
-    if ($m10 >= 2 && $m10 <= 4 && ($m100 < 12 || $m100 > 14)) return 'места';
-    return 'мест';
-}
 
 function is_site_user(int $uid): bool {
     return $uid < 0;
@@ -258,13 +252,7 @@ function site_book(array $in): array {
     $end = (clone $start)->modify("+$hours hour");
     $pretty = site_phone_pretty($digits);
     $total = $price * $seats;
-    $idsTxt = $seats > 1 ? '#' . implode(', #', $ids) : "#$bid";
-    notify_staff(($seats > 1 ? "🆕 <b>Бронь на компанию: $seats " . seats_word($seats) . "</b> · 🌐 с сайта\n" : "🆕 <b>Новая бронь #$bid</b> · 🌐 с сайта\n") . DIV . "\n"
-            . '👤 ' . esc($name) . " · $pretty\n"
-            . '🕹 ' . ZONES[$zone]['name'] . ($seats > 1 ? " · 👥 $seats " . seats_word($seats) : '') . "\n"
-            . '🎟 ' . TARIFFS[$tariff][0] . "\n"
-            . '📅 ' . fmt_dt($start) . "\n"
-            . ($seats > 1 ? "💰 $seats × $price ₽ = $total ₽\n🔖 $idsTxt" : "💰 $price ₽"));
+    notify_booking($bid);
 
     return [
         'ok'     => true,

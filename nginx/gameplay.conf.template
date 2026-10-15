@@ -66,6 +66,7 @@ server {
     location = /config.example.php { deny all; }
     location = /core.php           { deny all; }
     location = /site_booking.php   { deny all; }
+    location = /staff.php          { deny all; }
     location = /privacy_cleanup.php { deny all; }
     location = /deploy.sh          { deny all; }
     location = /server_setup.sh    { deny all; }
